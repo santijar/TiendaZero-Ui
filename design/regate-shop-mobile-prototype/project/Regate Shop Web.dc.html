@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/nocturne-d3a1095a-ad9d-496c-b0d9-9cb014acd16f/styles.css">
+<script src="_ds/nocturne-d3a1095a-ad9d-496c-b0d9-9cb014acd16f/_ds_bundle.js"></script>
+<script src="./image-slot.js"></script>
+<style>body{margin:0;background:var(--color-bg)}a{color:var(--color-accent)}a:hover{color:var(--color-accent-400)}</style>
+</helmet>
+<div style="min-height:100vh;display:flex;flex-direction:column;font-family:var(--font-body);color:var(--color-text);background-image:radial-gradient(80% 40% at 0% 0%, var(--color-accent-900), transparent 70%)">
+
+<header style="position:sticky;top:0;z-index:10;background:var(--color-bg);box-shadow:0 1px 0 var(--color-neutral-900)">
+<div style="max-width:1280px;margin:0 auto;padding:10px clamp(16px,4vw,40px);display:flex;align-items:center;gap:clamp(12px,3vw,32px)">
+<button onClick="{{ goHome }}" style="display:flex;align-items:center;gap:8px;background:none;border:0;cursor:pointer;color:var(--color-text);padding:0;font:inherit">
+<img class="lighten" src="assets/regate-logo.png" alt="Regate" style="width:44px;height:44px;margin:-4px -6px">
+<span style="font-size:17px;font-weight:500;letter-spacing:0.14em">REGATE</span>
+</button>
+<nav style="display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;min-width:0;flex:1 1 auto;margin-right:auto;white-space:nowrap;padding-right:24px;-webkit-mask-image:linear-gradient(to right, #000 calc(100% - 32px), transparent);mask-image:linear-gradient(to right, #000 calc(100% - 32px), transparent)">
+<sc-for list="{{ cats }}" as="c" hint-placeholder-count="5">
+<button onClick="{{ c.selectNav }}" style="font:inherit;font-size:13px;padding:6px 10px;border:0;border-radius:var(--radius-md);cursor:pointer;background:transparent;color:{{ c.navColor }}" style-hover="background:color-mix(in srgb, var(--color-text) 7%, transparent)">{{ c.label }}</button>
+</sc-for>
+</nav>
+<div style="position:relative;flex:0 1 240px;min-width:140px">
+<svg width="15" height="15" viewBox="0 0 256 256" fill="none" stroke="var(--color-neutral-500)" stroke-width="16" stroke-linecap="round" style="position:absolute;left:10px;top:11px"><circle cx="112" cy="112" r="72"></circle><line x1="163" y1="163" x2="224" y2="224"></line></svg>
+<input class="input" placeholder="Buscar productos" value="{{ query }}" onChange="{{ setQuery }}" style="padding-left:32px">
+</div>
+<button class="btn btn-secondary" onClick="{{ openCart }}" aria-label="Carrito" style="position:relative;height:36px">
+<svg width="17" height="17" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"><path d="M40 72h176l-12 144H52Z"></path><path d="M88 104V64a40 40 0 0 1 80 0v40"></path></svg>
+<span>{{ cartCount }}</span>
+</button>
+</div>
+</header>
+
+<main style="flex:1">
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+<div style="max-width:1280px;margin:0 auto;padding:8px clamp(16px,4vw,40px) 56px;display:flex;flex-direction:column;gap:36px">
+
+<sc-if value="{{ showPromo }}" hint-placeholder-val="{{ true }}">
+<section style="position:relative;aspect-ratio:16/7;min-height:320px;max-height:560px;border-radius:var(--radius-lg);overflow:hidden;background:var(--color-surface)">
+<div class="lighten" style="position:absolute;inset:0">
+<img src="assets/campaign-futbol.jpeg" alt="Fútbol" style="position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;object-position:center 45%;transition:opacity 700ms ease;opacity:{{ op0 }}">
+<img src="assets/campaign-running.jpeg" alt="Running" style="position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;object-position:center 45%;transition:opacity 700ms ease;opacity:{{ op1 }}">
+<img src="assets/campaign-training.jpeg" alt="Training" style="position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;object-position:center 45%;transition:opacity 700ms ease;opacity:{{ op2 }}">
+<img src="assets/campaign-basquet.jpeg" alt="Básquet" style="position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;object-position:center 45%;transition:opacity 700ms ease;opacity:{{ op3 }}">
+<img src="assets/campaign-estadio.jpeg" alt="Estadio" style="position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;object-position:center 45%;transition:opacity 700ms ease;opacity:{{ op4 }}">
+</div>
+<div style="position:absolute;inset:0;background:linear-gradient(0deg, var(--color-bg) 0%, color-mix(in srgb, var(--color-bg) 60%, transparent) 30%, transparent 58%);pointer-events:none"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:clamp(18px,3vw,32px);display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+<span class="card-kicker" style="color:var(--color-accent-300);font-size:11px">{{ slide.kicker }}</span>
+<span style="font-size:clamp(22px,2.6vw,30px);font-weight:500;letter-spacing:-0.015em;line-height:1.1">{{ slide.title }}</span>
+<div style="display:flex;gap:8px;margin-top:6px">
+<button class="btn btn-primary" style="height:40px;background:color-mix(in srgb, var(--color-bg) 60%, transparent)" onClick="{{ slide.go }}">{{ slide.cta }}</button>
+<button class="btn btn-secondary" style="height:40px;background:color-mix(in srgb, var(--color-bg) 60%, transparent)" onClick="{{ pickAll }}">Toda la tienda</button>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<button class="btn btn-secondary btn-icon" onClick="{{ prevSlide }}" aria-label="Anterior" style="border-radius:50%;background:color-mix(in srgb, var(--color-bg) 60%, transparent)"><svg width="16" height="16" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"><polyline points="160 208 80 128 160 48"></polyline></svg></button>
+<div style="display:flex;gap:6px">
+<sc-for list="{{ slides }}" as="sl" hint-placeholder-count="5">
+<button onClick="{{ sl.select }}" aria-label="{{ sl.title }}" style="height:3px;width:{{ sl.dotW }};padding:0;border:0;border-radius:2px;cursor:pointer;transition:width 300ms ease;background:{{ sl.dotBg }}"></button>
+</sc-for>
+</div>
+<button class="btn btn-secondary btn-icon" onClick="{{ nextSlide }}" aria-label="Siguiente" style="border-radius:50%;background:color-mix(in srgb, var(--color-bg) 60%, transparent)"><svg width="16" height="16" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"><polyline points="96 48 176 128 96 208"></polyline></svg></button>
+</div>
+</div>
+</section>
+</sc-if>
+
+<section style="display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+<div style="display:flex;flex-direction:column;gap:2px">
+<h2 style="margin:0;font-size:26px">{{ catTitle }}</h2>
+<span style="font-size:12px;color:var(--color-neutral-500)">{{ countLabel }}</span>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<sc-for list="{{ cats }}" as="c" hint-placeholder-count="5">
+<button onClick="{{ c.select }}" style="font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;cursor:pointer;background:{{ c.bg }};color:{{ c.color }};border:1px solid {{ c.border }}">{{ c.label }}</button>
+</sc-for>
+<select class="input" value="{{ sort }}" onChange="{{ setSort }}" style="width:auto;min-width:150px">
+<option value="rel">Destacados</option>
+<option value="asc">Menor precio</option>
+<option value="desc">Mayor precio</option>
+</select>
+</div>
+</div>
+<sc-if value="{{ noResults }}" hint-placeholder-val="{{ false }}">
+<div style="padding:40px 0;display:flex;flex-direction:column;gap:8px;align-items:flex-start"><span style="font-size:16px">No encontramos productos para “{{ query }}”.</span><button class="btn btn-ghost" onClick="{{ clearQuery }}">Limpiar búsqueda</button></div>
+</sc-if>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax({{ cardMin }},1fr));gap:28px 18px">
+<sc-for list="{{ visible }}" as="p" hint-placeholder-count="8">
+<div style="display:flex;flex-direction:column;gap:10px;cursor:pointer" onClick="{{ p.open }}">
+<div style="position:relative;aspect-ratio:3/4;border-radius:var(--radius-md);background:var(--color-surface);overflow:hidden;box-shadow:var(--shadow-sm)" style-hover="box-shadow:0 0 0 1px var(--color-accent)">
+<div class="lighten" style="position:absolute;inset:0;pointer-events:none"><image-slot id="p-{{ p.id }}" shape="rect" placeholder="Foto de producto"></image-slot></div>
+<sc-if value="{{ p.tag }}" hint-placeholder-val="{{ false }}"><span class="tag tag-accent" style="position:absolute;top:10px;left:10px">{{ p.tag }}</span></sc-if>
+<button onClick="{{ p.toggleFav }}" aria-label="Favorito" style="position:absolute;top:8px;right:8px;width:34px;height:34px;border-radius:50%;border:0;cursor:pointer;display:grid;place-items:center;background:color-mix(in srgb, var(--color-bg) 70%, transparent);color:{{ p.favColor }}"><svg width="16" height="16" viewBox="0 0 256 256" fill="{{ p.favFill }}" stroke="currentColor" stroke-width="16" stroke-linejoin="round"><path d="M128 216S24 160 24 94a54 54 0 0 1 104-20 54 54 0 0 1 104 20c0 66-104 122-104 122Z"></path></svg></button>
+<button class="btn btn-secondary" onClick="{{ p.quickAdd }}" style="position:absolute;left:10px;right:10px;bottom:10px;height:36px;background:color-mix(in srgb, var(--color-bg) 80%, transparent)" style-hover="color:var(--color-accent);border-color:var(--color-accent)">{{ p.quickLabel }}</button>
+</div>
+<div style="display:flex;flex-direction:column;gap:2px">
+<span style="font-size:14px;line-height:1.3">{{ p.name }}</span>
+<span style="font-size:12px;color:var(--color-neutral-500)">{{ p.cat }} · {{ p.color }}</span>
+<span style="font-size:15px;font-weight:500;margin-top:2px">{{ p.priceLabel }}</span>
+</div>
+</div>
+</sc-for>
+</div>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{ isProduct }}" hint-placeholder-val="{{ false }}">
+<div style="max-width:1280px;margin:0 auto;padding:8px clamp(16px,4vw,40px) 56px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;gap:6px;font-size:12px;color:var(--color-neutral-500);align-items:center">
+<a href="#" onClick="{{ goHomePrevent }}" style="color:var(--color-neutral-400);text-decoration:none">Tienda</a><span>/</span><span>{{ product.cat }}</span><span>/</span><span style="color:var(--color-text)">{{ product.name }}</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:clamp(24px,4vw,56px);align-items:start">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div style="grid-column:1 / -1;position:relative;aspect-ratio:4/5;border-radius:var(--radius-lg);overflow:hidden;background:var(--color-surface)"><div class="lighten" style="position:absolute;inset:0"><image-slot id="p-{{ product.id }}" shape="rect" placeholder="Foto principal"></image-slot></div></div>
+<div style="position:relative;aspect-ratio:1;border-radius:var(--radius-md);overflow:hidden;background:var(--color-surface)"><div class="lighten" style="position:absolute;inset:0"><image-slot id="p2-{{ product.id }}" shape="rect" placeholder="Detalle"></image-slot></div></div>
+<div style="position:relative;aspect-ratio:1;border-radius:var(--radius-md);overflow:hidden;background:var(--color-surface)"><div class="lighten" style="position:absolute;inset:0"><image-slot id="p3-{{ product.id }}" shape="rect" placeholder="Espalda"></image-slot></div></div>
+</div>
+<div style="position:sticky;top:80px;display:flex;flex-direction:column;gap:20px;max-width:480px">
+<div style="display:flex;flex-direction:column;gap:6px">
+<span class="card-kicker">{{ product.cat }}</span>
+<h1 style="margin:0;font-size:clamp(28px,3vw,36px)">{{ product.name }}</h1>
+<span style="font-size:22px;font-weight:500">{{ product.priceLabel }}</span>
+<span style="font-size:12px;color:var(--color-neutral-500)">{{ product.installments }}</span>
+</div>
+<p style="margin:0;font-size:14px;line-height:1.6;color:var(--color-neutral-300);text-wrap:pretty">{{ product.desc }}</p>
+<span style="font-size:13px;color:var(--color-neutral-400)">Color · <span style="color:var(--color-text)">{{ product.color }}</span></span>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--color-neutral-400)">Talle</span><a href="#" style="font-size:12px">Guía de talles</a></div>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<sc-for list="{{ sizes }}" as="s" hint-placeholder-count="5">
+<button onClick="{{ s.select }}" style="min-width:56px;height:44px;padding:0 12px;font:inherit;font-size:14px;cursor:pointer;border-radius:var(--radius-md);background:{{ s.bg }};color:{{ s.color }};border:1px solid {{ s.border }}">{{ s.label }}</button>
+</sc-for>
+</div>
+<sc-if value="{{ sizeError }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--color-accent-300)">Elegí un talle para continuar.</span></sc-if>
+</div>
+<div style="display:flex;gap:8px">
+<button class="btn btn-primary" style="flex:1;height:48px;font-size:15px" onClick="{{ addToCart }}"><svg width="18" height="18" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"><path d="M40 72h176l-12 144H52Z"></path><path d="M88 104V64a40 40 0 0 1 80 0v40"></path></svg>Agregar al carrito</button>
+<button class="btn btn-secondary btn-icon" style="width:48px;height:48px;color:{{ product.favColor }}" onClick="{{ product.toggleFav }}" aria-label="Favorito"><svg width="18" height="18" viewBox="0 0 256 256" fill="{{ product.favFill }}" stroke="currentColor" stroke-width="16" stroke-linejoin="round"><path d="M128 216S24 160 24 94a54 54 0 0 1 104-20 54 54 0 0 1 104 20c0 66-104 122-104 122Z"></path></svg></button>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--color-neutral-400)">
+<div style="display:flex;gap:10px;align-items:center"><svg width="18" height="18" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linejoin="round"><path d="M16 72h136v104H16Z"></path><path d="M152 104h48l40 40v32h-88"></path><circle cx="64" cy="184" r="20" fill="var(--color-bg)"></circle><circle cx="192" cy="184" r="20" fill="var(--color-bg)"></circle></svg>{{ shippingNote }}</div>
+<div style="display:flex;gap:10px;align-items:center"><svg width="18" height="18" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"><polyline points="80 56 32 104 80 152"></polyline><path d="M32 104h128a64 64 0 0 1 0 128h-40"></path></svg>Cambios gratis dentro de los 30 días</div>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isCheckout }}" hint-placeholder-val="{{ false }}">
+<div style="max-width:1080px;margin:0 auto;padding:16px clamp(16px,4vw,40px) 56px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;align-items:center;gap:8px">
+<button class="btn btn-ghost" onClick="{{ backFromCheckout }}"><svg width="16" height="16" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"><line x1="216" y1="128" x2="40" y2="128"></line><polyline points="112 56 40 128 112 200"></polyline></svg>Seguir comprando</button>
+</div>
+<h1 style="margin:0;font-size:32px">Checkout</h1>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:clamp(24px,4vw,48px);align-items:start">
+<div style="display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:10px">
+<h6 style="margin:0;color:var(--color-neutral-400)">Entrega</h6>
+<div class="seg" style="display:flex">
+<label class="seg-opt" style="flex:1;justify-content:center"><input type="radio" name="del" checked="{{ delHome }}" onChange="{{ setDelHome }}">Envío a domicilio</label>
+<label class="seg-opt" style="flex:1;justify-content:center"><input type="radio" name="del" checked="{{ delPickup }}" onChange="{{ setDelPickup }}">Retiro en local</label>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<h6 style="margin:0;color:var(--color-neutral-400)">Datos</h6>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+<div class="field"><label>Nombre y apellido</label><input class="input" value="{{ form.name }}" onChange="{{ setName }}" placeholder="Juan Pérez"></div>
+<div class="field"><label>Email</label><input class="input" type="email" value="{{ form.email }}" onChange="{{ setEmail }}" placeholder="juan@mail.com"></div>
+</div>
+<sc-if value="{{ delHome }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
+<div class="field"><label>Dirección</label><input class="input" value="{{ form.address }}" onChange="{{ setAddress }}" placeholder="Av. Corrientes 1234"></div>
+<div class="field"><label>Cód. postal</label><input class="input" value="{{ form.zip }}" onChange="{{ setZip }}" placeholder="1043"></div>
+</div>
+</sc-if>
+<sc-if value="{{ delPickup }}" hint-placeholder-val="{{ false }}">
+<div class="card" style="gap:2px"><span style="font-size:13px">Showroom Regate</span><span style="font-size:12px;color:var(--color-neutral-400)">Lun a vie · 10 a 19 h · Listo en 48 h</span></div>
+</sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<h6 style="margin:0;color:var(--color-neutral-400)">Pago</h6>
+<sc-for list="{{ payMethods }}" as="m" hint-placeholder-count="3">
+<label class="radio" style="justify-content:space-between;padding:12px 14px;border-radius:var(--radius-md);border:1px solid {{ m.border }}"><span style="display:flex;align-items:center;gap:10px"><input type="radio" name="pay" checked="{{ m.checked }}" onChange="{{ m.select }}"><span class="dot"></span>{{ m.label }}</span><span style="font-size:12px;color:var(--color-neutral-500)">{{ m.note }}</span></label>
+</sc-for>
+</div>
+</div>
+<aside class="card elev-sm" style="padding:18px;gap:14px;position:sticky;top:80px">
+<span style="font-size:15px;font-weight:500">Resumen · {{ cartCountLabel }}</span>
+<sc-for list="{{ lines }}" as="l" hint-placeholder-count="2">
+<div style="display:flex;gap:10px;align-items:center">
+<div style="position:relative;width:48px;height:60px;flex:none;border-radius:var(--radius-sm);overflow:hidden;background:var(--color-neutral-900)"><div class="lighten" style="position:absolute;inset:0;pointer-events:none"><image-slot id="p-{{ l.id }}" shape="rect" placeholder="Foto"></image-slot></div></div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-size:13px">{{ l.name }}</span><span style="font-size:11px;color:var(--color-neutral-500)">Talle {{ l.size }} · x{{ l.qty }}</span></div>
+<span style="font-size:13px">{{ l.totalLabel }}</span>
+</div>
+</sc-for>
+<div style="height:1px;background:linear-gradient(to right, transparent, var(--color-divider) 48px, var(--color-divider) calc(100% - 48px), transparent)"></div>
+<div style="display:flex;flex-direction:column;gap:6px;font-size:13px">
+<div style="display:flex;justify-content:space-between"><span style="color:var(--color-neutral-400)">Subtotal</span><span>{{ subtotalLabel }}</span></div>
+<div style="display:flex;justify-content:space-between"><span style="color:var(--color-neutral-400)">Envío</span><span>{{ shippingLabel }}</span></div>
+<sc-if value="{{ hasDiscount }}" hint-placeholder-val="{{ false }}"><div style="display:flex;justify-content:space-between"><span style="color:var(--color-neutral-400)">Transferencia −10%</span><span style="color:var(--color-accent-300)">{{ discountLabel }}</span></div></sc-if>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:4px"><span style="font-size:15px">Total</span><span style="font-size:22px;font-weight:500">{{ totalLabel }}</span></div>
+</div>
+<sc-if value="{{ formError }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--color-accent-300)">Completá tus datos para confirmar.</span></sc-if>
+<button class="btn btn-primary" style="height:48px;font-size:15px" onClick="{{ placeOrder }}">Confirmar pedido</button>
+</aside>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+<div style="max-width:1280px;margin:0 auto;padding:clamp(48px,10vw,120px) clamp(16px,4vw,40px);display:flex;flex-direction:column;align-items:flex-start;gap:14px">
+<div style="width:64px;height:64px;border-radius:50%;border:1px solid var(--color-accent);display:grid;place-items:center;color:var(--color-accent);box-shadow:0 0 24px color-mix(in srgb, var(--color-accent) 40%, transparent)"><svg width="28" height="28" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"><polyline points="40 136 96 192 216 72"></polyline></svg></div>
+<h1 style="margin:0">¡Pedido confirmado!</h1>
+<p style="margin:0;font-size:15px;color:var(--color-neutral-300);max-width:480px;text-wrap:pretty">Te enviamos el detalle a {{ doneEmail }}. Número de pedido <span style="color:var(--color-text)">{{ orderNo }}</span>.</p>
+<button class="btn btn-primary" style="margin-top:8px;height:40px" onClick="{{ restart }}">Seguir comprando</button>
+</div>
+</sc-if>
+</main>
+
+<footer style="max-width:1280px;width:100%;margin:0 auto;padding:20px clamp(16px,4vw,40px) 28px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--color-neutral-500)">
+<span>© 2026 Regate Indumentaria</span>
+<a href="https://www.instagram.com/regate.indumentaria/" style="color:var(--color-neutral-400)">@regate.indumentaria</a>
+</footer>
+
+<sc-if value="{{ cartOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;inset:0;z-index:20;background:color-mix(in srgb, var(--color-neutral-900) 60%, transparent)" onClick="{{ closeCart }}"></div>
+<aside style="position:fixed;top:0;right:0;bottom:0;z-index:21;width:min(420px,100%);background:var(--color-bg);box-shadow:var(--shadow-lg);display:flex;flex-direction:column">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px">
+<div style="display:flex;align-items:baseline;gap:10px"><span style="font-size:22px;font-weight:500">Carrito</span><span style="font-size:12px;color:var(--color-neutral-500)">{{ cartCountLabel }}</span></div>
+<button class="btn btn-icon" onClick="{{ closeCart }}" aria-label="Cerrar"><svg width="18" height="18" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round"><line x1="200" y1="56" x2="56" y2="200"></line><line x1="200" y1="200" x2="56" y2="56"></line></svg></button>
+</div>
+<sc-if value="{{ cartEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:32px 20px">
+<span style="font-size:17px;font-weight:500">Tu carrito está vacío</span>
+<span style="font-size:13px;color:var(--color-neutral-400)">Sumá prendas desde la tienda para verlas acá.</span>
+<button class="btn btn-primary" onClick="{{ closeCart }}">Ir a la tienda</button>
+</div>
+</sc-if>
+<sc-if value="{{ cartHasItems }}" hint-placeholder-val="{{ true }}">
+<div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding:4px 20px 16px">
+<sc-for list="{{ lines }}" as="l" hint-placeholder-count="2">
+<div style="display:flex;gap:12px">
+<div style="position:relative;width:80px;height:100px;flex:none;border-radius:var(--radius-md);overflow:hidden;background:var(--color-surface)"><div class="lighten" style="position:absolute;inset:0;pointer-events:none"><image-slot id="p-{{ l.id }}" shape="rect" placeholder="Foto"></image-slot></div></div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+<div style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:14px;line-height:1.3">{{ l.name }}</span>
+<button class="btn btn-icon" onClick="{{ l.remove }}" aria-label="Quitar" style="width:28px;height:28px;margin:-4px -6px 0 0;color:var(--color-neutral-500)"><svg width="16" height="16" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"><line x1="216" y1="56" x2="40" y2="56"></line><path d="M200 56v152H56V56"></path><path d="M168 56V40a16 16 0 0 0-16-16h-48a16 16 0 0 0-16 16v16"></path></svg></button></div>
+<span style="font-size:11px;color:var(--color-neutral-500)">Talle {{ l.size }} · {{ l.color }}</span>
+<div style="margin-top:auto;display:flex;align-items:center;justify-content:space-between">
+<div style="display:flex;align-items:center;border:1px solid var(--color-divider);border-radius:var(--radius-md)">
+<button onClick="{{ l.dec }}" aria-label="Menos" style="width:32px;height:30px;border:0;background:transparent;color:var(--color-text);cursor:pointer;display:grid;place-items:center"><svg width="12" height="12" viewBox="0 0 256 256" stroke="currentColor" stroke-width="20" stroke-linecap="round"><line x1="40" y1="128" x2="216" y2="128"></line></svg></button>
+<span style="min-width:20px;text-align:center;font-size:13px">{{ l.qty }}</span>
+<button onClick="{{ l.inc }}" aria-label="Más" style="width:32px;height:30px;border:0;background:transparent;color:var(--color-text);cursor:pointer;display:grid;place-items:center"><svg width="12" height="12" viewBox="0 0 256 256" stroke="currentColor" stroke-width="20" stroke-linecap="round"><line x1="40" y1="128" x2="216" y2="128"></line><line x1="128" y1="40" x2="128" y2="216"></line></svg></button>
+</div>
+<span style="font-size:14px;font-weight:500">{{ l.totalLabel }}</span>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="padding:16px 20px 20px;display:flex;flex-direction:column;gap:10px;background:var(--color-surface)">
+<span style="font-size:12px;color:var(--color-neutral-300)">{{ freeShipMsg }}</span>
+<div style="height:3px;border-radius:2px;background:var(--color-neutral-800);overflow:hidden"><div style="height:100%;width:{{ freeShipPct }};background:var(--color-accent);box-shadow:0 0 8px var(--color-accent)"></div></div>
+<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:4px"><span style="color:var(--color-neutral-400)">Subtotal</span><span>{{ subtotalLabel }}</span></div>
+<div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--color-neutral-400)">Envío</span><span>{{ shippingLabel }}</span></div>
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:15px">Total</span><span style="font-size:20px;font-weight:500">{{ totalLabel }}</span></div>
+<span style="font-size:11px;color:var(--color-neutral-500)">{{ cartInstallments }}</span>
+<button class="btn btn-primary" style="height:46px;font-size:15px;margin-top:4px" onClick="{{ goCheckout }}">Finalizar compra</button>
+</div>
+</sc-if>
+</aside>
+</sc-if>
+
+<sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;right:24px;bottom:24px;z-index:15;max-width:calc(100% - 48px);padding:12px 14px;border-radius:var(--radius-md);background:var(--color-surface);box-shadow:var(--shadow-md);display:flex;align-items:center;gap:12px;font-size:13px">
+<svg width="16" height="16" viewBox="0 0 256 256" fill="none" stroke="var(--color-accent)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"><polyline points="40 136 96 192 216 72"></polyline></svg>
+<span>{{ toast }}</span>
+<button class="btn btn-ghost" onClick="{{ openCart }}">Ver carrito</button>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;gridDensity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;compact&quot;,&quot;regular&quot;,&quot;large&quot;],&quot;default&quot;:&quot;regular&quot;,&quot;tsType&quot;:&quot;'compact'|'regular'|'large'&quot;},&quot;showPromo&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;freeShippingFrom&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:120000,&quot;min&quot;:0,&quot;max&quot;:500000,&quot;step&quot;:10000,&quot;tsType&quot;:&quot;number&quot;}}">
+const PRODUCTS = [
+  { id: 'cam-titular', name: 'Camiseta Titular 26', cat: 'Camisetas', price: 48900, tag: 'Nuevo', color: 'Negro', sizes: ['S','M','L','XL','XXL'], desc: 'Tela dry-fit liviana con paneles de ventilación laterales. Corte regular, cuello redondo y escudo termoadherido.' },
+  { id: 'cam-alt', name: 'Camiseta Alternativa', cat: 'Camisetas', price: 45900, tag: null, color: 'Blanco', sizes: ['S','M','L','XL','XXL'], desc: 'Versión suplente en tejido microperforado. Secado rápido y costuras planas para evitar roces.' },
+  { id: 'short-train', name: 'Short de Entrenamiento', cat: 'Shorts', price: 28500, tag: null, color: 'Negro', sizes: ['S','M','L','XL','XXL'], desc: 'Short con cintura elástica y cordón, bolsillos laterales con cierre y tela elastizada en cuatro direcciones.' },
+  { id: 'buzo-hz', name: 'Buzo Half-Zip', cat: 'Abrigo', price: 72900, tag: 'Entrenamiento', color: 'Gris topo', sizes: ['S','M','L','XL','XXL'], desc: 'Primera capa térmica con medio cierre, puños con orificio para pulgar y logo reflectivo.' },
+  { id: 'campera', name: 'Campera Rompeviento', cat: 'Abrigo', price: 89900, tag: null, color: 'Negro', sizes: ['S','M','L','XL','XXL'], desc: 'Repelente al agua, capucha ajustable y bolsillo canguro. Se guarda en su propio bolsillo.' },
+  { id: 'remera-dry', name: 'Remera Dry Training', cat: 'Camisetas', price: 32900, tag: 'Entrenamiento', color: 'Azul noche', sizes: ['S','M','L','XL','XXL'], desc: 'Remera de entrenamiento de secado rápido, corte atlético y detalles en contraste.' },
+  { id: 'medias', name: 'Medias Técnicas', cat: 'Accesorios', price: 9900, tag: null, color: 'Negro', sizes: ['S','M','L'], desc: 'Medias con zonas de compresión y puntera reforzada. Talle S (35–38), M (39–42), L (43–46).' },
+  { id: 'bolso', name: 'Bolso Deportivo', cat: 'Accesorios', price: 54900, tag: null, color: 'Negro', sizes: ['Único'], desc: 'Bolso de 40 L con compartimento ventilado para botines y correa acolchada.' },
+];
+const CATS = ['Todo', 'Camisetas', 'Shorts', 'Abrigo', 'Accesorios'];
+const fmt = n => '$ ' + Math.round(n).toLocaleString('es-AR');
+const SLIDES = [
+  { src: 'assets/campaign-futbol.jpeg', kicker: 'Fútbol', title: 'Hecho para la cancha', cta: 'Ver camisetas', cat: 'Camisetas' },
+  { src: 'assets/campaign-running.jpeg', kicker: 'Running', title: 'Cada kilómetro cuenta', cta: 'Ver shorts', cat: 'Shorts' },
+  { src: 'assets/campaign-training.jpeg', kicker: 'Training', title: 'Entrená como jugás', cta: 'Ver colección', cat: 'Entrenamiento' },
+  { src: 'assets/campaign-basquet.jpeg', kicker: 'Básquet', title: 'Dominá la duela', cta: 'Ver remeras', cat: 'Camisetas' },
+  { src: 'assets/campaign-estadio.jpeg', kicker: 'Temporada 26', title: 'Salí a la cancha con Regate', cta: 'Toda la tienda', cat: 'Todo' },
+];
+const EMPTY_FORM = { name: '', email: '', address: '', zip: '' };
+
+class Component extends DCLogic {
+  state = {
+    screen: 'home', cat: 'Todo', query: '', sort: 'rel', pid: null, size: null, sizeError: false,
+    cart: [{ id: 'cam-titular', size: 'M', qty: 1 }], cartOpen: false, favs: {}, toast: null,
+    del: 'home', pay: 'mp', form: EMPTY_FORM, formError: false, orderNo: ''
+  };
+  componentDidMount() { this.startAuto(); }
+  componentWillUnmount() { clearTimeout(this.t); clearInterval(this.auto); }
+  startAuto = () => { clearInterval(this.auto); this.auto = setInterval(() => this.setState(s => ({ slide: ((s.slide || 0) + 1) % SLIDES.length })), 6000); };
+  setSlide = i => { this.setState({ slide: (i + SLIDES.length) % SLIDES.length }); this.startAuto(); };
+  top = () => window.scrollTo({ top: 0 });
+  go = screen => { this.setState({ screen, cartOpen: false, toast: null, sizeError: false, formError: false }); this.top(); };
+  open = pid => { const p = PRODUCTS.find(x => x.id === pid); this.setState({ screen: 'product', pid, size: p.sizes.length === 1 ? p.sizes[0] : null, sizeError: false }); this.top(); };
+  toggleFav = (e, id) => { e && e.stopPropagation(); this.setState(s => ({ favs: { ...s.favs, [id]: !s.favs[id] } })); };
+  add = (pid, size) => {
+    this.setState(s => {
+      const i = s.cart.findIndex(c => c.id === pid && c.size === size);
+      const cart = i >= 0 ? s.cart.map((c, j) => j === i ? { ...c, qty: c.qty + 1 } : c) : [...s.cart, { id: pid, size, qty: 1 }];
+      return { cart, toast: PRODUCTS.find(p => p.id === pid).name + ' · Talle ' + size + ' agregado' };
+    });
+    clearTimeout(this.t);
+    this.t = setTimeout(() => this.setState({ toast: null }), 3000);
+  };
+  addToCart = () => { if (!this.state.size) return this.setState({ sizeError: true }); this.add(this.state.pid, this.state.size); };
+  quickAdd = (e, p) => { e.stopPropagation(); if (p.sizes.length === 1) this.add(p.id, p.sizes[0]); else this.open(p.id); };
+  setQty = (i, d) => this.setState(s => ({ cart: s.cart.map((c, j) => j === i ? { ...c, qty: c.qty + d } : c).filter(c => c.qty > 0) }));
+  setField = k => e => { const v = e.target.value; this.setState(s => ({ form: { ...s.form, [k]: v }, formError: false })); };
+  placeOrder = () => {
+    const f = this.state.form;
+    if (!f.name.trim() || !f.email.trim() || (this.state.del === 'home' && !f.address.trim())) return this.setState({ formError: true });
+    this.setState({ screen: 'done', orderNo: 'RG-' + (20000 + Math.floor(Math.random() * 9000)) }); this.top();
+  };
+
+  renderVals() {
+    const s = this.state;
+    const threshold = this.props.freeShippingFrom ?? 120000;
+    const density = this.props.gridDensity ?? 'regular';
+    const acc = 'var(--color-accent)';
+    const favOf = id => ({ favColor: s.favs[id] ? acc : 'var(--color-text)', favFill: s.favs[id] ? acc : 'none', toggleFav: e => this.toggleFav(e, id) });
+    const decorate = p => ({ ...p, priceLabel: fmt(p.price), installments: '3 cuotas sin interés de ' + fmt(p.price / 3), open: () => this.open(p.id), quickAdd: e => this.quickAdd(e, p), quickLabel: p.sizes.length === 1 ? 'Agregar al carrito' : 'Elegir talle', ...favOf(p.id) });
+    const q = s.query.trim().toLowerCase();
+    let visible = PRODUCTS.filter(p => (s.cat === 'Todo' || p.cat === s.cat || (s.cat === 'Entrenamiento' && p.tag === 'Entrenamiento')) && (!q || (p.name + ' ' + p.cat).toLowerCase().includes(q)));
+    if (s.sort === 'asc') visible = [...visible].sort((a, b) => a.price - b.price);
+    if (s.sort === 'desc') visible = [...visible].sort((a, b) => b.price - a.price);
+    visible = visible.map(decorate);
+    const product = s.pid ? decorate(PRODUCTS.find(p => p.id === s.pid)) : { sizes: [] };
+    const lines = s.cart.map((c, i) => { const p = PRODUCTS.find(x => x.id === c.id); return { ...p, size: c.size, qty: c.qty, totalLabel: fmt(p.price * c.qty), inc: () => this.setQty(i, 1), dec: () => this.setQty(i, -1), remove: () => this.setQty(i, -c.qty) }; });
+    const subtotal = lines.reduce((a, l) => a + l.price * l.qty, 0);
+    const cartCount = lines.reduce((a, l) => a + l.qty, 0);
+    const shipping = subtotal >= threshold || s.del === 'pickup' ? 0 : 6500;
+    const discount = s.pay === 'transfer' ? subtotal * 0.1 : 0;
+    const total = subtotal + shipping - discount;
+    const pays = [{ k: 'mp', label: 'Mercado Pago', note: 'Hasta 6 cuotas' }, { k: 'card', label: 'Tarjeta de crédito', note: '3 sin interés' }, { k: 'transfer', label: 'Transferencia', note: '10% off' }];
+    const pickCat = c => { this.setState({ cat: c, screen: 'home' }); };
+    const si = s.slide || 0;
+    const slides = SLIDES.map((x, i) => ({ ...x, opacity: i === si ? 1 : 0, dotW: i === si ? '22px' : '8px', dotBg: i === si ? acc : 'var(--color-neutral-400)', select: () => this.setSlide(i) }));
+    const cur = SLIDES[si];
+    return {
+      op0: si === 0 ? 1 : 0, op1: si === 1 ? 1 : 0, op2: si === 2 ? 1 : 0, op3: si === 3 ? 1 : 0, op4: si === 4 ? 1 : 0,
+      slides, slide: { ...cur, go: () => this.setState({ cat: cur.cat }) },
+      prevSlide: () => this.setSlide(si - 1), nextSlide: () => this.setSlide(si + 1),
+      isHome: s.screen === 'home', isProduct: s.screen === 'product', isCheckout: s.screen === 'checkout', isDone: s.screen === 'done',
+      showPromo: (this.props.showPromo ?? true) && s.cat === 'Todo' && !q,
+      cardMin: density === 'compact' ? '180px' : density === 'large' ? '280px' : '220px',
+      cats: CATS.map(c => { const on = s.cat === c; return { label: c, select: () => pickCat(c), selectNav: () => { pickCat(c); this.top(); }, navColor: on && s.screen === 'home' ? acc : 'var(--color-neutral-300)', bg: on ? 'var(--color-accent-900)' : 'transparent', color: on ? 'var(--color-accent-200)' : 'var(--color-neutral-300)', border: on ? acc : 'var(--color-divider)' }; }),
+      catTitle: q ? 'Resultados' : s.cat === 'Todo' ? 'Todos los productos' : s.cat,
+      countLabel: visible.length + (visible.length === 1 ? ' producto' : ' productos'),
+      noResults: visible.length === 0,
+      query: s.query, setQuery: e => this.setState({ query: e.target.value, screen: 'home' }), clearQuery: () => this.setState({ query: '' }),
+      sort: s.sort, setSort: e => this.setState({ sort: e.target.value }),
+      visible, product,
+      pickTraining: () => this.setState({ cat: 'Entrenamiento' }), pickAll: () => this.setState({ cat: 'Todo' }),
+      sizes: product.sizes.map(z => { const on = s.size === z; return { label: z, select: () => this.setState({ size: z, sizeError: false }), bg: on ? 'var(--color-accent-900)' : 'transparent', color: on ? 'var(--color-accent-200)' : 'var(--color-text)', border: on ? acc : (s.sizeError ? 'var(--color-accent-700)' : 'var(--color-divider)') }; }),
+      sizeError: s.sizeError,
+      shippingNote: 'Envío gratis en compras desde ' + fmt(threshold),
+      addToCart: this.addToCart,
+      lines, cartCount, cartEmpty: lines.length === 0, cartHasItems: lines.length > 0,
+      cartCountLabel: cartCount + (cartCount === 1 ? ' producto' : ' productos'),
+      subtotalLabel: fmt(subtotal), shippingLabel: shipping ? fmt(shipping) : 'Gratis', totalLabel: fmt(total),
+      hasDiscount: discount > 0, discountLabel: '− ' + fmt(discount),
+      cartInstallments: '3 cuotas sin interés de ' + fmt(total / 3),
+      freeShipMsg: subtotal >= threshold ? 'Tenés envío gratis en este pedido.' : 'Te faltan ' + fmt(threshold - subtotal) + ' para el envío gratis.',
+      freeShipPct: Math.min(100, (subtotal / threshold) * 100) + '%',
+      toast: s.toast,
+      cartOpen: s.cartOpen, openCart: () => this.setState({ cartOpen: true, toast: null }), closeCart: () => this.setState({ cartOpen: false }),
+      goHome: () => this.go('home'), goHomePrevent: e => { e.preventDefault(); this.go('home'); },
+      goCheckout: () => { if (lines.length) this.go('checkout'); },
+      backFromCheckout: () => this.go('home'),
+      delHome: s.del === 'home', delPickup: s.del === 'pickup',
+      setDelHome: () => this.setState({ del: 'home' }), setDelPickup: () => this.setState({ del: 'pickup' }),
+      form: s.form, setName: this.setField('name'), setEmail: this.setField('email'), setAddress: this.setField('address'), setZip: this.setField('zip'),
+      payMethods: pays.map(m => ({ ...m, checked: s.pay === m.k, select: () => this.setState({ pay: m.k }), border: s.pay === m.k ? acc : 'var(--color-divider)' })),
+      formError: s.formError, placeOrder: this.placeOrder,
+      doneEmail: s.form.email || 'tu email', orderNo: s.orderNo,
+      restart: () => { this.setState({ screen: 'home', cart: [], form: EMPTY_FORM, cat: 'Todo' }); this.top(); },
+    };
+  }
+}
+</script>
+</body>
+</html>
