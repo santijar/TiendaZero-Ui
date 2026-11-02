@@ -1,0 +1,15 @@
+@import './nocturne.css';
+
+/* Page-level overrides from the prototype's <helmet> (Regate Shop Web.dc.html). */
+body {
+  margin: 0;
+  background: var(--color-bg);
+}
+
+a {
+  color: var(--color-accent);
+}
+
+a:hover {
+  color: var(--color-accent-400);
+}

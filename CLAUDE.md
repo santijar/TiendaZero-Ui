@@ -7,7 +7,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **TiendaZero-Ui**: the storefront frontend of TiendaZero, a multi-tenant white-label e-commerce
 platform (Regate is the first tenant). The backend is a separate repo, TiendaZero-Api
 (https://github.com/santijar/TiendaZero-Api). Implementation follows `docs/plan.md`
-(milestones 0–6). **Milestone 0 (scaffold + CI) is done.** Only a placeholder home route exists.
+(milestones 0–6). **Milestone 0 (scaffold + CI) is done.** Milestone 1 step 1 (static UI) is built:
+the storefront screens from the design bundle run on a static catalog fixture
+(`src/catalog/products.ts`) and client-only Pinia stores. There are no API calls yet.
+
+- Nocturne tokens/classes live in `src/assets/nocturne.css`, a verbatim copy of the bundle's
+  `styles.css`. Re-copy it rather than editing it.
+- Shipping cost, installment count and transfer discount are platform constants in
+  `src/lib/commerce.ts` (plan §5). Shipping is 0, so the prototype's free-shipping threshold and
+  progress bar are intentionally not built.
 
 - Vue 3 + Vite + TypeScript + Vue Router + Pinia. Vitest + @vue/test-utils for tests.
   oxlint + ESLint + Prettier (no semicolons, single quotes, 100 cols).
