@@ -12,7 +12,15 @@ storefront screens from the design bundle are built (step 1). The catalog (categ
 collections, product list and detail) comes from the Api (step 2, `src/api/catalog.ts`). The
 cart comes from the Api (step 3, `src/api/cart.ts`). Customer accounts are built (step 4,
 `src/api/auth.ts`, `src/stores/auth.ts`): `/ingresar`, `/registrarse`, `/recuperar`,
-`/restablecer` and `/cuenta` (profile name and favorites). Checkout is still client-only.
+`/restablecer` and `/cuenta` (profile name, order history and favorites). Checkout is real
+(step 5, `src/api/orders.ts`): confirming places the order with one idempotency key per checkout
+visit. A Mercado Pago order then leaves for Checkout Pro (`leaveTo` in `src/lib/navigation.ts`,
+stubbed in tests). A transfer order goes to `/pedido/:number`, which shows the bank details.
+The order page also opens from the emailed link (`?token=`, remembered in localStorage by
+`src/lib/orderAccess.ts` and then dropped from the URL). Every time it opens an unpaid Mercado Pago order it
+syncs with the Api, because Mercado Pago offers no way back to a non-public address and shoppers
+close tabs. When it's opened from Mercado Pago's return (`payment_id`/`collection_status` in the
+query), it also polls briefly while the payment is still pending.
 
 - The home promo carousel is static content in `src/catalog/promos.ts`. Each slide's CTA applies
   a category or collection slug filter.
@@ -29,8 +37,8 @@ cart comes from the Api (step 3, `src/api/cart.ts`). Customer accounts are built
 - After sign-in, `?next=` is followed only for same-site paths (`src/lib/navigation.ts`).
 - The auth screens have no design in the bundle. They're built from Nocturne's form pieces in
   the checkout's frame (`AuthLayout.vue`, `src/assets/forms.css`).
-- Tests stub `fetch` with an in-memory Api (`src/__tests__/fakeApi.ts`: catalog, cart, auth and
-  account). Build a fresh router per mounted app with `createAppRouter(createMemoryHistory())`,
+- Tests stub `fetch` with an in-memory Api (`src/__tests__/fakeApi.ts`: catalog, cart, auth,
+  account and orders). Build a fresh router per mounted app with `createAppRouter(createMemoryHistory())`,
   because vue-router runs guards in the first app it was installed on. Preload lazily-routed views
   in `beforeAll` (see `auth.spec.ts`), since `flushPromises` doesn't wait for a first dynamic
   import.

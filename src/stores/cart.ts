@@ -151,6 +151,16 @@ export const useCartStore = defineStore('cart', () => {
     return ensureLoaded()
   }
 
+  // Placing an order converts the cart on the server, so the shopper starts a fresh one.
+  function afterOrderPlaced(): Promise<void> {
+    return onSessionChanged()
+  }
+
+  // Re-reads the cart, e.g. after checkout found that stock changed under it.
+  async function reload() {
+    await withCart(getCart).catch(() => {})
+  }
+
   async function add(product: { slug: string; name: string }, size: string): Promise<boolean> {
     try {
       await withCart((t) => addCartItem(t, { productSlug: product.slug, size }), true)
@@ -210,6 +220,8 @@ export const useCartStore = defineStore('cart', () => {
     ensureLoaded,
     guestToken,
     onSessionChanged,
+    afterOrderPlaced,
+    reload,
     add,
     changeQty,
     remove,

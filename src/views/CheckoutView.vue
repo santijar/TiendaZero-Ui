@@ -2,6 +2,13 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { ApiError } from '@/api/http'
+import {
+  placeOrder as submitOrder,
+  startCheckout,
+  type Delivery,
+  type PaymentMethod,
+} from '@/api/orders'
 import AppIcon from '@/components/AppIcon.vue'
 import ProductImage from '@/components/ProductImage.vue'
 import {
@@ -10,25 +17,27 @@ import {
   formatPrice,
   productCountLabel,
 } from '@/lib/commerce'
+import { leaveTo } from '@/lib/navigation'
+import { rememberOrderToken } from '@/lib/orderAccess'
 import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
-import { useOrderStore } from '@/stores/order'
 
-type Delivery = 'home' | 'pickup'
 // Mercado Pago Checkout Pro covers cards too, so there's no separate card option (plan decisions).
-type PaymentMethod = 'mp' | 'transfer'
-
 const PAYMENT_METHODS: { key: PaymentMethod; label: string; note: string }[] = [
-  { key: 'mp', label: 'Mercado Pago', note: 'Hasta 6 cuotas' },
+  { key: 'mercadopago', label: 'Mercado Pago', note: 'Hasta 6 cuotas' },
   { key: 'transfer', label: 'Transferencia', note: '10% off' },
 ]
 
 const router = useRouter()
 const cart = useCartStore()
-const orders = useOrderStore()
 
 const delivery = ref<Delivery>('home')
-const payment = ref<PaymentMethod>('mp')
+const payment = ref<PaymentMethod>('mercadopago')
+const busy = ref(false)
+const orderError = ref<string | null>(null)
+// One key for this checkout visit: retrying after a failed or lost response can't place the order
+// twice. The Api only spends the key on success.
+const idempotencyKey = crypto.randomUUID()
 // Signed-in shoppers start with their account's name and email filled in.
 const auth = useAuthStore()
 const form = reactive({
@@ -46,18 +55,69 @@ const total = computed(() => cart.subtotal + SHIPPING_COST - discount.value)
 
 function clearError() {
   formError.value = false
+  orderError.value = null
+}
+
+// Why the Api refused the order, in words for the shopper.
+function refusal(error: unknown): string {
+  if (!(error instanceof ApiError)) return 'No pudimos confirmar el pedido. Probá de nuevo.'
+  if (error.status === 409 && Array.isArray(error.problem?.items)) {
+    const items = error.problem.items as { productSlug: string; size: string; stock: number }[]
+    const names = items.map((i) => {
+      const line = cart.lines.find((l) => l.slug === i.productSlug && l.size === i.size)
+      return `${line?.name ?? i.productSlug} (talle ${i.size})`
+    })
+    return `No hay stock suficiente de ${names.join(', ')}. Revisá tu carrito.`
+  }
+  const firstField = Object.values(error.problem?.errors ?? {})[0]?.[0]
+  return firstField ?? error.problem?.detail ?? 'No pudimos confirmar el pedido. Probá de nuevo.'
 }
 
 async function placeOrder() {
-  const missingAddress = delivery.value === 'home' && !form.address.trim()
+  if (busy.value) return
+  const missingAddress = delivery.value === 'home' && (!form.address.trim() || !form.zip.trim())
   if (!form.name.trim() || !form.email.trim() || missingAddress) {
     formError.value = true
     return
   }
-  orders.place(form.email.trim())
-  // Stand-in until orders exist (step 5): placing an order just empties the server cart.
-  await cart.clear().catch(() => {})
-  await router.push({ name: 'order-confirmed' })
+
+  busy.value = true
+  orderError.value = null
+  try {
+    const placed = await submitOrder(
+      {
+        email: form.email.trim(),
+        name: form.name.trim(),
+        delivery: delivery.value,
+        address:
+          delivery.value === 'home'
+            ? { street: form.address.trim(), postalCode: form.zip.trim() }
+            : null,
+        paymentMethod: payment.value,
+      },
+      idempotencyKey,
+      cart.guestToken(),
+    )
+    const { number } = placed.order
+    rememberOrderToken(number, placed.accessToken)
+    await cart.afterOrderPlaced()
+
+    if (placed.order.paymentMethod === 'mercadopago') {
+      try {
+        leaveTo(await startCheckout(number, placed.accessToken))
+        return
+      } catch {
+        // The order exists; its page offers paying again.
+      }
+    }
+    await router.push({ name: 'order', params: { number } })
+  } catch (error) {
+    orderError.value = refusal(error)
+    if (error instanceof ApiError && error.status === 409) await cart.reload()
+    if (error instanceof ApiError && error.status === 422) await router.push({ name: 'home' })
+  } finally {
+    busy.value = false
+  }
 }
 </script>
 
@@ -184,8 +244,9 @@ async function placeOrder() {
           </div>
         </div>
         <span v-if="formError" class="form-error">Completá tus datos para confirmar.</span>
-        <button type="button" class="btn btn-primary confirm" @click="placeOrder">
-          Confirmar pedido
+        <span v-if="orderError" class="form-error" role="alert">{{ orderError }}</span>
+        <button type="button" class="btn btn-primary confirm" :disabled="busy" @click="placeOrder">
+          {{ busy ? 'Confirmando…' : 'Confirmar pedido' }}
         </button>
       </aside>
     </div>
