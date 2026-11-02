@@ -48,7 +48,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
       <template v-else>
         <div class="lines">
-          <div v-for="(l, i) in cart.lines" :key="`${l.slug}-${l.size}`" class="line">
+          <div v-for="l in cart.lines" :key="l.id" class="line">
             <div class="thumb">
               <ProductImage :src="l.imageUrl" :alt="l.name" placeholder="Foto" />
             </div>
@@ -59,7 +59,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   type="button"
                   class="btn btn-icon remove"
                   aria-label="Quitar"
-                  @click="cart.remove(i)"
+                  :disabled="cart.updating"
+                  @click="cart.remove(l)"
                 >
                   <AppIcon name="trash" />
                 </button>
@@ -67,11 +68,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               <span class="meta">Talle {{ l.size }} · {{ l.color }}</span>
               <div class="info-bottom">
                 <div class="stepper">
-                  <button type="button" aria-label="Menos" @click="cart.changeQty(i, -1)">
+                  <button
+                    type="button"
+                    aria-label="Menos"
+                    :disabled="cart.updating"
+                    @click="cart.changeQty(l, -1)"
+                  >
                     <AppIcon name="minus" :size="12" :stroke-width="20" />
                   </button>
                   <span>{{ l.qty }}</span>
-                  <button type="button" aria-label="Más" @click="cart.changeQty(i, 1)">
+                  <button
+                    type="button"
+                    aria-label="Más"
+                    :disabled="cart.updating || l.qty >= l.maxQty"
+                    @click="cart.changeQty(l, 1)"
+                  >
                     <AppIcon name="plus" :size="12" :stroke-width="20" />
                   </button>
                 </div>
@@ -242,6 +253,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   cursor: pointer;
   display: grid;
   place-items: center;
+}
+
+.stepper button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .stepper span {

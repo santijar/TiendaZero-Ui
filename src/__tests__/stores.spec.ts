@@ -6,12 +6,12 @@ import { getProducts } from '../api/catalog'
 import { formatPrice, installmentsLabel } from '../lib/commerce'
 import { useCartStore } from '../stores/cart'
 import { useCatalogStore } from '../stores/catalog'
-import { CATEGORIES, PRODUCTS, stubCatalogApi } from './fakeApi'
+import { CATEGORIES, PRODUCTS, stubApi, type FakeApi } from './fakeApi'
 
 const titular = PRODUCTS[0]!
 const bolso = PRODUCTS[1]!
 
-function requestedUrls(fetchMock: ReturnType<typeof stubCatalogApi>) {
+function requestedUrls(fetchMock: FakeApi['fetchMock']) {
   return fetchMock.mock.calls.map(([input]) => String(input))
 }
 
@@ -19,7 +19,7 @@ describe('catalog API client', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('sends only the filters that are set', async () => {
-    const fetchMock = stubCatalogApi()
+    const fetchMock = stubApi().fetchMock
 
     await getProducts({})
     await getProducts({ category: 'abrigo', q: '  buzo ', sort: 'price-asc' })
@@ -34,11 +34,11 @@ describe('catalog API client', () => {
 })
 
 describe('catalog store', () => {
-  let fetchMock: ReturnType<typeof stubCatalogApi>
+  let fetchMock: FakeApi['fetchMock']
 
   beforeEach(() => {
     setActivePinia(createPinia())
-    fetchMock = stubCatalogApi()
+    fetchMock = stubApi().fetchMock
   })
 
   afterEach(() => {
@@ -100,45 +100,79 @@ describe('catalog store', () => {
 })
 
 describe('cart store', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  let api: FakeApi
 
-  it('merges repeat adds of the same product and size', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+    api = stubApi()
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('creates a server cart on the first add and remembers its token', async () => {
     const cart = useCartStore()
-    cart.add(titular, 'M')
-    cart.add(titular, 'M')
-    cart.add(titular, 'L')
-    cart.add(bolso, 'Único')
+    await cart.add(titular, 'M')
+    await cart.add(titular, 'M')
+    await cart.add(bolso, 'Único')
 
     expect(cart.lines.map((l) => [l.slug, l.size, l.qty])).toEqual([
       ['cam-titular', 'M', 2],
-      ['cam-titular', 'L', 1],
       ['bolso', 'Único', 1],
     ])
-    expect(cart.count).toBe(4)
-    expect(cart.subtotal).toBe(48900 * 3 + 54900)
+    expect(cart.count).toBe(3)
+    expect(cart.subtotal).toBe(48900 * 2 + 54900)
+    expect(localStorage.getItem('tiendazero.cartToken')).toBe('token-1')
+    expect(api.carts.size).toBe(1)
   })
 
-  it('snapshots only the fields the cart needs', () => {
-    const cart = useCartStore()
-    cart.add(titular, 'M')
+  it('restores the stored cart on load', async () => {
+    await useCartStore().add(bolso, 'Único')
 
-    expect(Object.keys(cart.entries[0]!).sort()).toEqual(
-      ['color', 'imageUrl', 'name', 'price', 'qty', 'size', 'slug'].sort(),
-    )
+    setActivePinia(createPinia())
+    const reloaded = useCartStore()
+    await reloaded.ensureLoaded()
+
+    expect(reloaded.lines.map((l) => l.slug)).toEqual(['bolso'])
   })
 
-  it('drops a line when its quantity reaches zero', () => {
+  it('starts a fresh cart when the stored token is no longer valid', async () => {
+    localStorage.setItem('tiendazero.cartToken', 'expired')
     const cart = useCartStore()
-    cart.add(titular, 'M')
-    cart.changeQty(0, -1)
+    await cart.ensureLoaded()
+    expect(cart.isEmpty).toBe(true)
+    expect(localStorage.getItem('tiendazero.cartToken')).toBeNull()
+
+    await cart.add(bolso, 'Único')
+    expect(cart.count).toBe(1)
+    expect(localStorage.getItem('tiendazero.cartToken')).toBe('token-1')
+  })
+
+  it('reports a stock conflict instead of adding', async () => {
+    const cart = useCartStore()
+    await cart.add(titular, 'L')
+    await cart.add(titular, 'L')
+
+    expect(await cart.add(titular, 'L')).toBe(false)
+    expect(cart.toast).toEqual({ kind: 'error', message: 'Solo quedan 2 unidades de este talle.' })
+    expect(cart.lines[0]!.qty).toBe(2)
+  })
+
+  it('removes a line when its quantity drops to zero', async () => {
+    const cart = useCartStore()
+    await cart.add(titular, 'M')
+    await cart.changeQty(cart.lines[0]!, -1)
 
     expect(cart.isEmpty).toBe(true)
   })
 
-  it('clears the toast when the drawer opens', () => {
+  it('shows a success toast that clears when the drawer opens', async () => {
     const cart = useCartStore()
-    cart.add(bolso, 'Único')
-    expect(cart.toast).toBe('Bolso Deportivo · Talle Único agregado')
+    await cart.add(bolso, 'Único')
+    expect(cart.toast).toEqual({
+      kind: 'success',
+      message: 'Bolso Deportivo · Talle Único agregado',
+    })
 
     cart.open()
     expect(cart.toast).toBeNull()

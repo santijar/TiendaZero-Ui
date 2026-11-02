@@ -64,7 +64,7 @@ function addToCart() {
     sizeError.value = true
     return
   }
-  cart.add({ ...product.value, imageUrl: product.value.images[0]?.url ?? null }, size.value)
+  void cart.add(product.value, size.value)
 }
 </script>
 

@@ -1,63 +1,169 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-// What the cart keeps about a product: a snapshot taken when it was added. The cart moves to the
-// API later in Milestone 1, which will own prices and stock from then on.
-export interface CartProduct {
+import {
+  addCartItem,
+  clearCart,
+  createCart,
+  getCart,
+  removeCartItem,
+  updateCartItem,
+  type Cart,
+} from '@/api/cart'
+import { ApiError } from '@/api/http'
+
+export interface CartLine {
+  id: number
   slug: string
   name: string
   price: number
   color: string
   imageUrl: string | null
-}
-
-export interface CartLine extends CartProduct {
   size: string
   qty: number
   total: number
+  maxQty: number
 }
 
+export interface Toast {
+  kind: 'success' | 'error'
+  message: string
+}
+
+const TOKEN_KEY = 'tiendazero.cartToken'
 const TOAST_MS = 3000
+const EMPTY_CART: Cart = { items: [], count: 0, subtotal: 0 }
+
+// The guest token is what makes the cart survive reloads. Storage can be unavailable (private
+// mode, blocked site data), in which case the cart just lasts for the tab's lifetime.
+function readToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+function writeToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token)
+    else localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // See readToken.
+  }
+}
+
+const isNotFound = (error: unknown) => error instanceof ApiError && error.status === 404
+
+function stockMessage(error: unknown): string | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null
+  const stock = Number(error.problem?.stock ?? 0)
+  if (stock === 0) return 'No queda stock de este talle.'
+  return stock === 1
+    ? 'Solo queda 1 unidad de este talle.'
+    : `Solo quedan ${stock} unidades de este talle.`
+}
 
 export const useCartStore = defineStore('cart', () => {
-  const entries = ref<(CartProduct & { size: string; qty: number })[]>([])
+  let token = readToken()
+  const cart = ref<Cart>(EMPTY_CART)
   const isOpen = ref(false)
-  const toast = ref<string | null>(null)
+  // True while a quantity change or removal is in flight, so the drawer can't stack requests.
+  const updating = ref(false)
+  let loaded: Promise<void> | undefined
+  const toast = ref<Toast | null>(null)
   let toastTimer: ReturnType<typeof setTimeout> | undefined
 
   const lines = computed<CartLine[]>(() =>
-    entries.value.map((e) => ({ ...e, total: e.price * e.qty })),
+    cart.value.items.map((i) => ({
+      id: i.id,
+      slug: i.productSlug,
+      name: i.name,
+      price: i.unitPrice,
+      color: i.color,
+      imageUrl: i.imageUrl,
+      size: i.size,
+      qty: i.quantity,
+      total: i.lineTotal,
+      maxQty: i.maxQuantity,
+    })),
   )
-  const count = computed(() => lines.value.reduce((sum, l) => sum + l.qty, 0))
-  const subtotal = computed(() => lines.value.reduce((sum, l) => sum + l.total, 0))
-  const isEmpty = computed(() => lines.value.length === 0)
+  const count = computed(() => cart.value.count)
+  const subtotal = computed(() => cart.value.subtotal)
+  const isEmpty = computed(() => cart.value.items.length === 0)
 
-  function add(product: CartProduct, size: string) {
-    const existing = entries.value.find((e) => e.slug === product.slug && e.size === size)
-    if (existing) existing.qty++
-    else {
-      const { slug, name, price, color, imageUrl } = product
-      entries.value.push({ slug, name, price, color, imageUrl, size, qty: 1 })
-    }
-
-    toast.value = `${product.name} · Talle ${size} agregado`
+  function showToast(kind: Toast['kind'], message: string) {
+    toast.value = { kind, message }
     clearTimeout(toastTimer)
     toastTimer = setTimeout(() => (toast.value = null), TOAST_MS)
   }
 
-  function changeQty(index: number, delta: number) {
-    const entry = entries.value[index]
-    if (!entry) return
-    entry.qty += delta
-    if (entry.qty <= 0) entries.value.splice(index, 1)
+  function forgetCart() {
+    token = null
+    writeToken(null)
+    cart.value = EMPTY_CART
   }
 
-  function remove(index: number) {
-    entries.value.splice(index, 1)
+  // Runs a call against the current cart. If the server no longer knows the token (cart expired or
+  // converted), the local cart is dropped; `retryOnNewCart` then repeats the call on a fresh one.
+  async function withCart(call: (token: string) => Promise<Cart>, retryOnNewCart = false) {
+    if (!token && retryOnNewCart) {
+      token = await createCart()
+      writeToken(token)
+    }
+    if (!token) return
+    try {
+      cart.value = await call(token)
+    } catch (error) {
+      if (!isNotFound(error)) throw error
+      forgetCart()
+      if (retryOnNewCart) await withCart(call, true)
+    }
   }
 
-  function clear() {
-    entries.value = []
+  // Loads the stored cart once per page load; later calls reuse the same promise.
+  function ensureLoaded(): Promise<void> {
+    loaded ??= withCart(getCart).catch(() => {})
+    return loaded
+  }
+
+  async function add(product: { slug: string; name: string }, size: string): Promise<boolean> {
+    try {
+      await withCart((t) => addCartItem(t, { productSlug: product.slug, size }), true)
+      showToast('success', `${product.name} · Talle ${size} agregado`)
+      return true
+    } catch (error) {
+      showToast('error', stockMessage(error) ?? 'No pudimos agregar el producto. Probá de nuevo.')
+      return false
+    }
+  }
+
+  async function changeQty(line: CartLine, delta: number) {
+    const qty = line.qty + delta
+    updating.value = true
+    try {
+      if (qty <= 0) await withCart((t) => removeCartItem(t, line.id))
+      else await withCart((t) => updateCartItem(t, line.id, qty))
+    } catch (error) {
+      showToast('error', stockMessage(error) ?? 'No pudimos actualizar el carrito.')
+    } finally {
+      updating.value = false
+    }
+  }
+
+  async function remove(line: CartLine) {
+    updating.value = true
+    try {
+      await withCart((t) => removeCartItem(t, line.id))
+    } catch {
+      showToast('error', 'No pudimos actualizar el carrito.')
+    } finally {
+      updating.value = false
+    }
+  }
+
+  async function clear() {
+    await withCart(clearCart)
   }
 
   function open() {
@@ -70,13 +176,14 @@ export const useCartStore = defineStore('cart', () => {
   }
 
   return {
-    entries,
     isOpen,
+    updating,
     toast,
     lines,
     count,
     subtotal,
     isEmpty,
+    ensureLoaded,
     add,
     changeQty,
     remove,

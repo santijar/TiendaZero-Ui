@@ -25,7 +25,7 @@ function open() {
 }
 
 function quickAdd() {
-  if (singleSize.value) cart.add(props.product, singleSize.value)
+  if (singleSize.value) void cart.add(props.product, singleSize.value)
   else open()
 }
 </script>
