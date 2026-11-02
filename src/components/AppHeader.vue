@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import logo from '@/assets/regate-logo.png'
+import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
 import { useCatalogStore } from '@/stores/catalog'
 import AppIcon from './AppIcon.vue'
@@ -11,6 +12,7 @@ const route = useRoute()
 const router = useRouter()
 const catalog = useCatalogStore()
 const cart = useCartStore()
+const auth = useAuthStore()
 
 const onHome = computed(() => route.name === 'home')
 
@@ -60,6 +62,14 @@ function onSearch(event: Event) {
           @input="onSearch"
         />
       </div>
+      <RouterLink
+        :to="{ name: auth.isSignedIn ? 'account' : 'login' }"
+        class="btn btn-secondary btn-icon account"
+        :aria-label="auth.isSignedIn ? 'Mi cuenta' : 'Ingresar'"
+        :title="auth.isSignedIn ? auth.user?.name : 'Ingresar'"
+      >
+        <AppIcon name="user" :size="17" />
+      </RouterLink>
       <button type="button" class="btn btn-secondary cart" aria-label="Carrito" @click="cart.open">
         <AppIcon name="bag" :size="17" />
         <span>{{ cart.count }}</span>
@@ -167,5 +177,16 @@ function onSearch(event: Event) {
 .cart {
   position: relative;
   height: 36px;
+}
+
+/* Pairs with the cart button; the global a:hover color doesn't apply to it. */
+.account,
+.account:hover {
+  flex: none;
+  color: var(--color-text);
+}
+
+.account.router-link-active {
+  color: var(--color-accent);
 }
 </style>

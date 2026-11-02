@@ -130,19 +130,128 @@ function createCartServer() {
   }
 }
 
+interface FakeUser {
+  id: string
+  name: string
+  password: string
+  favorites: string[]
+}
+
+// A minimal auth server: users, the refresh cookie (one per test "browser"), and access tokens that
+// tests can expire to exercise the refresh-and-retry path.
+function createAuthServer(cartServer: ReturnType<typeof createCartServer>) {
+  const users = new Map<string, FakeUser>()
+  const accessTokens = new Map<string, string>() // token -> email
+  const state = { session: null as string | null, issued: 0, refreshes: 0 }
+
+  const sessionFor = (email: string) => {
+    const user = users.get(email)!
+    const accessToken = `access-${++state.issued}`
+    accessTokens.set(accessToken, email)
+    state.session = email
+    return {
+      accessToken,
+      expiresAt: '2099-01-01T00:00:00Z',
+      user: { id: user.id, email, name: user.name, roles: ['Customer'] },
+    }
+  }
+  const adoptGuestCart = (email: string, cartToken: string | null) => {
+    const guest = cartToken ? cartServer.carts.get(cartToken) : undefined
+    if (!guest) return
+    const account = cartServer.carts.get(`user:${email}`) ?? []
+    cartServer.carts.set(`user:${email}`, [...account, ...guest])
+    cartServer.carts.delete(cartToken!)
+  }
+
+  return {
+    users,
+    state,
+    // Every issued access token stops working, as if they all expired.
+    expireAccessTokens: () => accessTokens.clear(),
+    emailFor: (authorization: string | null) =>
+      authorization ? (accessTokens.get(authorization.replace('Bearer ', '')) ?? 'invalid') : null,
+    handle(method: string, path: string, body: Record<string, unknown>, cartToken: string | null) {
+      const email = String(body.email ?? '')
+      if (path === '/api/auth/register') {
+        if (users.has(email)) {
+          return json({ errors: { email: ['Ya existe una cuenta con ese email.'] } }, 400)
+        }
+        if (String(body.password).length < 8) {
+          return json(
+            { errors: { password: ['La contraseña debe tener al menos 8 caracteres.'] } },
+            400,
+          )
+        }
+        users.set(email, {
+          id: `u${users.size + 1}`,
+          name: String(body.name),
+          password: String(body.password),
+          favorites: [],
+        })
+        adoptGuestCart(email, cartToken)
+        return json(sessionFor(email))
+      }
+      if (path === '/api/auth/login') {
+        if (users.get(email)?.password !== body.password) {
+          return json({ detail: 'El email o la contraseña no son correctos.' }, 401)
+        }
+        adoptGuestCart(email, cartToken)
+        return json(sessionFor(email))
+      }
+      if (path === '/api/auth/refresh') {
+        state.refreshes++
+        return state.session ? json(sessionFor(state.session)) : json({ detail: 'expired' }, 401)
+      }
+      if (path === '/api/auth/logout') {
+        state.session = null
+        return new Response(null, { status: 204 })
+      }
+      if (path === '/api/auth/forgot-password') return new Response(null, { status: 202 })
+      return json({ status: 404 }, 404)
+    },
+    handleAccount(method: string, path: string, email: string, body: Record<string, unknown>) {
+      const user = users.get(email)!
+      if (path === '/api/account' && method === 'PATCH') {
+        user.name = String(body.name)
+        return json({ id: user.id, email, name: user.name, roles: ['Customer'] })
+      }
+      if (path === '/api/account/favorites') {
+        return json(user.favorites.map((slug) => PRODUCTS.find((p) => p.slug === slug)!))
+      }
+      const slug = decodeURIComponent(path.replace('/api/account/favorites/', ''))
+      user.favorites = user.favorites.filter((f) => f !== slug)
+      if (method === 'PUT') user.favorites.unshift(slug)
+      return new Response(null, { status: 204 })
+    },
+  }
+}
+
 export type FakeApi = ReturnType<typeof stubApi>
 
-// Stubs `fetch` with a tiny in-memory version of the Api (catalog + guest cart). Returns the mock,
-// so tests can inspect requested URLs, and the cart server's state.
+// Stubs `fetch` with a tiny in-memory version of the Api (catalog, cart, auth, account). Returns
+// the mock, so tests can inspect requested URLs, plus the fake servers' state.
 export function stubApi() {
   const cartServer = createCartServer()
+  const authServer = createAuthServer(cartServer)
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
     const url = new URL(String(input), 'http://localhost')
     const method = init?.method ?? 'GET'
     const headers = new Headers(init?.headers)
+    const body = init?.body ? JSON.parse(String(init.body)) : {}
+    if (url.pathname.startsWith('/api/auth/')) {
+      return authServer.handle(method, url.pathname, body, headers.get('X-Cart-Token'))
+    }
+
+    // Like the Api: a bearer token that doesn't validate is a 401 on every endpoint.
+    const email = authServer.emailFor(headers.get('Authorization'))
+    if (email === 'invalid') return json({ status: 401 }, 401)
+    if (url.pathname.startsWith('/api/account')) {
+      return email ? authServer.handleAccount(method, url.pathname, email, body) : json({}, 401)
+    }
     if (url.pathname.startsWith('/api/cart')) {
-      const body = init?.body ? JSON.parse(String(init.body)) : {}
-      return cartServer.handle(method, url.pathname, headers.get('X-Cart-Token'), body)
+      const key = email ? `user:${email}` : headers.get('X-Cart-Token')
+      if (email && !cartServer.carts.has(key!)) cartServer.carts.set(key!, [])
+      return cartServer.handle(method, url.pathname, key, body)
     }
     if (url.pathname === '/api/categories') return json(CATEGORIES)
     if (url.pathname === '/api/collections') return json([])
@@ -155,5 +264,5 @@ export function stubApi() {
     return json({ status: 404 }, 404)
   })
   vi.stubGlobal('fetch', fetchMock)
-  return { fetchMock, carts: cartServer.carts }
+  return { fetchMock, carts: cartServer.carts, auth: authServer }
 }

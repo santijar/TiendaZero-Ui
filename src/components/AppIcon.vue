@@ -15,6 +15,7 @@ export type IconName =
   | 'minus'
   | 'plus'
   | 'image'
+  | 'user'
 
 withDefaults(
   defineProps<{ name: IconName; size?: number; strokeWidth?: number; filled?: boolean }>(),
@@ -76,6 +77,10 @@ withDefaults(
     <template v-else-if="name === 'plus'">
       <line x1="40" y1="128" x2="216" y2="128" />
       <line x1="128" y1="40" x2="128" y2="216" />
+    </template>
+    <template v-else-if="name === 'user'">
+      <circle cx="128" cy="96" r="64" />
+      <path d="M32 216c19.37-33.47 54.55-56 96-56s76.63 22.53 96 56" />
     </template>
     <template v-else-if="name === 'image'">
       <rect x="32" y="48" width="192" height="160" rx="8" />

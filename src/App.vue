@@ -6,8 +6,10 @@ import AddedToast from '@/components/AddedToast.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import CartDrawer from '@/components/CartDrawer.vue'
+import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
 import { useCatalogStore } from '@/stores/catalog'
+import { useFavoritesStore } from '@/stores/favorites'
 
 const catalog = useCatalogStore()
 
@@ -15,6 +17,13 @@ onMounted(() => {
   // Without categories the header only offers "Todo"; the store still works, so don't block on it.
   catalog.loadTaxonomy().catch(() => {})
   void catalog.loadProducts()
+  // Restore the session from the refresh cookie; the cart waits for it (see ensureLoaded).
+  const auth = useAuthStore()
+  void auth.ready().then(() =>
+    useFavoritesStore()
+      .load()
+      .catch(() => {}),
+  )
   void useCartStore().ensureLoaded()
 })
 </script>
