@@ -13,6 +13,10 @@ export default defineConfig({
     },
   },
   server: {
+    // The default (`localhost`) bound only to ::1 on Windows, leaving 127.0.0.1:5173 unreachable.
+    host: '127.0.0.1',
+    port: 5173,
+    strictPort: true,
     // Matches the `http` profile in TiendaZero-Api: src/TiendaZero.Api/Properties/launchSettings.json.
     proxy: {
       '/api': 'http://localhost:5043',
