@@ -2,14 +2,14 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
-import type { Product } from '@/catalog/products'
+import type { ProductSummary } from '@/api/catalog'
 import { formatPrice } from '@/lib/commerce'
 import { useCartStore } from '@/stores/cart'
 import { useFavoritesStore } from '@/stores/favorites'
 import AppIcon from './AppIcon.vue'
 import ProductImage from './ProductImage.vue'
 
-const props = defineProps<{ product: Product }>()
+const props = defineProps<{ product: ProductSummary }>()
 
 const router = useRouter()
 const cart = useCartStore()
@@ -18,10 +18,10 @@ const favorites = useFavoritesStore()
 const singleSize = computed(() =>
   props.product.sizes.length === 1 ? props.product.sizes[0] : undefined,
 )
-const isFavorite = computed(() => favorites.isFavorite(props.product.id))
+const isFavorite = computed(() => favorites.isFavorite(props.product.slug))
 
 function open() {
-  router.push({ name: 'product', params: { id: props.product.id } })
+  router.push({ name: 'product', params: { slug: props.product.slug } })
 }
 
 function quickAdd() {
@@ -33,15 +33,15 @@ function quickAdd() {
 <template>
   <div class="card-item" @click="open">
     <div class="media">
-      <ProductImage :src="product.image" :alt="product.name" placeholder="Foto de producto" />
-      <span v-if="product.tag" class="tag tag-accent badge">{{ product.tag }}</span>
+      <ProductImage :src="product.imageUrl" :alt="product.name" placeholder="Foto de producto" />
+      <span v-if="product.badge" class="tag tag-accent badge">{{ product.badge }}</span>
       <button
         type="button"
         class="fav"
         :class="{ on: isFavorite }"
         aria-label="Favorito"
         :aria-pressed="isFavorite"
-        @click.stop="favorites.toggle(product.id)"
+        @click.stop="favorites.toggle(product.slug)"
       >
         <AppIcon name="heart" :filled="isFavorite" />
       </button>
@@ -50,10 +50,14 @@ function quickAdd() {
       </button>
     </div>
     <div class="details">
-      <RouterLink :to="{ name: 'product', params: { id: product.id } }" class="name" @click.stop>
+      <RouterLink
+        :to="{ name: 'product', params: { slug: product.slug } }"
+        class="name"
+        @click.stop
+      >
         {{ product.name }}
       </RouterLink>
-      <span class="meta">{{ product.category }} · {{ product.color }}</span>
+      <span class="meta">{{ product.categoryName }} · {{ product.color }}</span>
       <span class="price">{{ formatPrice(product.price) }}</span>
     </div>
   </div>

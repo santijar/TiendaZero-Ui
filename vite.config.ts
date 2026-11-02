@@ -20,6 +20,8 @@ export default defineConfig({
     // Matches the `http` profile in TiendaZero-Api: src/TiendaZero.Api/Properties/launchSettings.json.
     proxy: {
       '/api': 'http://localhost:5043',
+      // Product photos, served by the Api until they move to Cloudflare R2.
+      '/media': 'http://localhost:5043',
     },
   },
 })
