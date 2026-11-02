@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { findProduct } from '@/catalog/products'
+import { getProduct, type ProductDetail } from '@/api/catalog'
+import { ApiError } from '@/api/http'
 import AppIcon from '@/components/AppIcon.vue'
 import ProductImage from '@/components/ProductImage.vue'
 import { formatPrice, installmentsLabel } from '@/lib/commerce'
@@ -9,24 +10,48 @@ import { useCartStore } from '@/stores/cart'
 import { useFavoritesStore } from '@/stores/favorites'
 import NotFoundView from './NotFoundView.vue'
 
-const props = defineProps<{ id: string }>()
+const props = defineProps<{ slug: string }>()
 
 const cart = useCartStore()
 const favorites = useFavoritesStore()
 
-const product = computed(() => findProduct(props.id))
+const product = ref<ProductDetail | null>(null)
+const status = ref<'loading' | 'ready' | 'not-found' | 'error'>('loading')
 const size = ref<string | null>(null)
 const sizeError = ref(false)
-const isFavorite = computed(() => favorites.isFavorite(props.id))
+const isFavorite = computed(() => favorites.isFavorite(props.slug))
 
-watch(
-  product,
-  (p) => {
-    size.value = p?.sizes.length === 1 ? p.sizes[0]! : null
-    sizeError.value = false
-  },
-  { immediate: true },
-)
+// Main photo plus two detail shots; missing photos fall back to the empty image slot.
+const gallery = computed(() => {
+  const images = product.value?.images ?? []
+  const name = product.value?.name ?? ''
+  return [
+    { image: images[0], alt: name, placeholder: 'Foto principal' },
+    { image: images[1], alt: `${name}, detalle`, placeholder: 'Detalle' },
+    { image: images[2], alt: `${name}, espalda`, placeholder: 'Espalda' },
+  ]
+})
+
+let inflight: AbortController | undefined
+
+async function load(slug: string) {
+  inflight?.abort()
+  const controller = (inflight = new AbortController())
+  status.value = 'loading'
+  sizeError.value = false
+  try {
+    const p = await getProduct(slug, controller.signal)
+    product.value = p
+    const available = p.sizes.filter((s) => s.inStock)
+    size.value = p.sizes.length === 1 && available.length === 1 ? available[0]!.size : null
+    status.value = 'ready'
+  } catch (error) {
+    if (controller.signal.aborted) return
+    status.value = error instanceof ApiError && error.status === 404 ? 'not-found' : 'error'
+  }
+}
+
+watch(() => props.slug, load, { immediate: true })
 
 function selectSize(s: string) {
   size.value = s
@@ -39,36 +64,40 @@ function addToCart() {
     sizeError.value = true
     return
   }
-  cart.add(product.value, size.value)
+  cart.add({ ...product.value, imageUrl: product.value.images[0]?.url ?? null }, size.value)
 }
 </script>
 
 <template>
-  <NotFoundView v-if="!product" />
-  <div v-else class="product">
+  <NotFoundView v-if="status === 'not-found'" />
+  <div v-else-if="status === 'error'" class="product">
+    <div class="message">
+      <span>No pudimos cargar este producto.</span>
+      <button type="button" class="btn btn-ghost" @click="load(slug)">Reintentar</button>
+    </div>
+  </div>
+  <div v-else-if="product && status === 'ready'" class="product">
     <div class="crumbs">
       <RouterLink :to="{ name: 'home' }">Tienda</RouterLink>
-      <span>/</span><span>{{ product.category }}</span
+      <span>/</span><span>{{ product.categoryName }}</span
       ><span>/</span>
       <span class="current">{{ product.name }}</span>
     </div>
 
     <div class="layout">
       <div class="gallery">
-        <div class="shot main">
-          <ProductImage :src="product.image" :alt="product.name" placeholder="Foto principal" />
-        </div>
-        <div class="shot">
-          <ProductImage :src="null" :alt="`${product.name}, detalle`" placeholder="Detalle" />
-        </div>
-        <div class="shot">
-          <ProductImage :src="null" :alt="`${product.name}, espalda`" placeholder="Espalda" />
+        <div v-for="(g, i) in gallery" :key="g.placeholder" class="shot" :class="{ main: i === 0 }">
+          <ProductImage
+            :src="g.image?.url ?? null"
+            :alt="g.image?.alt ?? g.alt"
+            :placeholder="g.placeholder"
+          />
         </div>
       </div>
 
       <div class="panel">
         <div class="intro">
-          <span class="card-kicker">{{ product.category }}</span>
+          <span class="card-kicker">{{ product.categoryName }}</span>
           <h1>{{ product.name }}</h1>
           <span class="price">{{ formatPrice(product.price) }}</span>
           <span class="installments">{{ installmentsLabel(product.price) }}</span>
@@ -86,14 +115,16 @@ function addToCart() {
           <div class="size-options" role="radiogroup" aria-label="Talle">
             <button
               v-for="s in product.sizes"
-              :key="s"
+              :key="s.size"
               type="button"
               role="radio"
-              :aria-checked="size === s"
-              :class="{ active: size === s, error: sizeError }"
-              @click="selectSize(s)"
+              :aria-checked="size === s.size"
+              :disabled="!s.inStock"
+              :title="s.inStock ? undefined : 'Sin stock'"
+              :class="{ active: size === s.size, error: sizeError }"
+              @click="selectSize(s.size)"
             >
-              {{ s }}
+              {{ s.size }}
             </button>
           </div>
           <span v-if="sizeError" class="size-error">Elegí un talle para continuar.</span>
@@ -109,7 +140,7 @@ function addToCart() {
             :class="{ on: isFavorite }"
             aria-label="Favorito"
             :aria-pressed="isFavorite"
-            @click="favorites.toggle(product.id)"
+            @click="favorites.toggle(product.slug)"
           >
             <AppIcon name="heart" :size="18" :filled="isFavorite" />
           </button>
@@ -269,6 +300,23 @@ function addToCart() {
   background: var(--color-accent-900);
   color: var(--color-accent-200);
   border-color: var(--color-accent);
+}
+
+/* Nocturne's disabled treatment (45% opacity), plus a strike-through so "sold out" doesn't rely on
+   opacity alone. */
+.size-options button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.message {
+  padding: 40px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 16px;
 }
 
 .size-error {

@@ -7,9 +7,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **TiendaZero-Ui**: the storefront frontend of TiendaZero, a multi-tenant white-label e-commerce
 platform (Regate is the first tenant). The backend is a separate repo, TiendaZero-Api
 (https://github.com/santijar/TiendaZero-Api). Implementation follows `docs/plan.md`
-(milestones 0–6). **Milestone 0 (scaffold + CI) is done.** Milestone 1 step 1 (static UI) is built:
-the storefront screens from the design bundle run on a static catalog fixture
-(`src/catalog/products.ts`) and client-only Pinia stores. There are no API calls yet.
+(milestones 0–6). **Milestone 0 (scaffold + CI) is done.** Milestone 1 is in progress: the
+storefront screens from the design bundle are built (step 1). The catalog (categories,
+collections, product list and detail) comes from the Api (step 2, `src/api/catalog.ts`). The
+cart, favorites and checkout are still client-only Pinia stores; the cart keeps a snapshot of
+each product it holds.
+
+- The home promo carousel is static content in `src/catalog/promos.ts`. Each slide's CTA applies
+  a category or collection slug filter.
+- Tests stub `fetch` with an in-memory catalog API (`src/__tests__/fakeApi.ts`).
 
 - Nocturne tokens/classes live in `src/assets/nocturne.css`, a verbatim copy of the bundle's
   `styles.css`. Re-copy it rather than editing it.
@@ -19,7 +25,7 @@ the storefront screens from the design bundle run on a static catalog fixture
 
 - Vue 3 + Vite + TypeScript + Vue Router + Pinia. Vitest + @vue/test-utils for tests.
   oxlint + ESLint + Prettier (no semicolons, single quotes, 100 cols).
-- The dev server proxies `/api` to `http://localhost:5043` (the Api's `http` launch profile),
+- The dev server proxies `/api` and `/media` (product photos) to `http://localhost:5043` (the Api's `http` launch profile),
   so run the Api locally alongside `npm run dev`.
 - `design/` is excluded from oxlint and ESLint (`.oxlintrc.json`, `eslint.config.ts`). It's
   reference material, not app code.

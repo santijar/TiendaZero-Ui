@@ -3,7 +3,6 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import logo from '@/assets/regate-logo.png'
-import { CATEGORIES, ALL_CATEGORY } from '@/catalog/products'
 import { useCartStore } from '@/stores/cart'
 import { useCatalogStore } from '@/stores/catalog'
 import AppIcon from './AppIcon.vue'
@@ -16,12 +15,12 @@ const cart = useCartStore()
 const onHome = computed(() => route.name === 'home')
 
 function goHome() {
-  catalog.category = ALL_CATEGORY
+  catalog.setFilter({})
   router.push({ name: 'home' })
 }
 
-function selectCategory(category: string) {
-  catalog.category = category
+function selectCategory(slug: string | null) {
+  catalog.setFilter(slug ? { category: slug } : {})
   if (onHome.value) window.scrollTo({ top: 0 })
   else router.push({ name: 'home' })
 }
@@ -41,13 +40,13 @@ function onSearch(event: Event) {
       </button>
       <nav class="nav-cats" aria-label="Categorías">
         <button
-          v-for="c in CATEGORIES"
-          :key="c"
+          v-for="c in catalog.categoryOptions"
+          :key="c.label"
           type="button"
-          :class="{ active: onHome && catalog.category === c }"
-          @click="selectCategory(c)"
+          :class="{ active: onHome && catalog.isCategoryActive(c.slug) }"
+          @click="selectCategory(c.slug)"
         >
-          {{ c }}
+          {{ c.label }}
         </button>
       </nav>
       <div class="search">

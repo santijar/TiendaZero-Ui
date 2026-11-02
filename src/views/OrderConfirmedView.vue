@@ -2,7 +2,6 @@
 import { useRouter } from 'vue-router'
 
 import AppIcon from '@/components/AppIcon.vue'
-import { ALL_CATEGORY } from '@/catalog/products'
 import { useCatalogStore } from '@/stores/catalog'
 import { useOrderStore } from '@/stores/order'
 
@@ -11,7 +10,7 @@ const catalog = useCatalogStore()
 const orders = useOrderStore()
 
 function keepShopping() {
-  catalog.category = ALL_CATEGORY
+  catalog.setFilter({})
   router.push({ name: 'home' })
 }
 </script>

@@ -48,9 +48,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
       <template v-else>
         <div class="lines">
-          <div v-for="(l, i) in cart.lines" :key="`${l.id}-${l.size}`" class="line">
+          <div v-for="(l, i) in cart.lines" :key="`${l.slug}-${l.size}`" class="line">
             <div class="thumb">
-              <ProductImage :src="l.image" :alt="l.name" placeholder="Foto" />
+              <ProductImage :src="l.imageUrl" :alt="l.name" placeholder="Foto" />
             </div>
             <div class="info">
               <div class="info-top">

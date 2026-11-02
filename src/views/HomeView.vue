@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { ALL_CATEGORY, CATEGORIES } from '@/catalog/products'
+import type { ProductSort } from '@/api/catalog'
 import PromoCarousel from '@/components/PromoCarousel.vue'
 import ProductCard from '@/components/ProductCard.vue'
 import { productCountLabel } from '@/lib/commerce'
-import { useCatalogStore, type SortOrder } from '@/stores/catalog'
+import { useCatalogStore } from '@/stores/catalog'
 
 const catalog = useCatalogStore()
 
-const showPromo = computed(() => catalog.category === ALL_CATEGORY && !catalog.isSearching)
+const showPromo = computed(() => catalog.isUnfiltered && !catalog.isSearching)
+const countLabel = computed(() =>
+  catalog.status === 'ready' ? productCountLabel(catalog.total) : ' ',
+)
+const isEmpty = computed(() => catalog.status === 'ready' && catalog.products.length === 0)
 
 function onSort(event: Event) {
-  catalog.sort = (event.target as HTMLSelectElement).value as SortOrder
+  catalog.sort = (event.target as HTMLSelectElement).value as ProductSort
 }
 </script>
 
@@ -20,41 +24,51 @@ function onSort(event: Event) {
   <div class="home">
     <PromoCarousel v-if="showPromo" />
 
-    <section class="catalog">
+    <section class="catalog" :aria-busy="catalog.status === 'loading'">
       <div class="toolbar">
         <div class="heading">
           <h2>{{ catalog.title }}</h2>
-          <span class="count">{{ productCountLabel(catalog.visibleProducts.length) }}</span>
+          <span class="count">{{ countLabel }}</span>
         </div>
         <div class="filters">
           <button
-            v-for="c in CATEGORIES"
-            :key="c"
+            v-for="c in catalog.categoryOptions"
+            :key="c.label"
             type="button"
             class="pill"
-            :class="{ active: catalog.category === c }"
-            :aria-pressed="catalog.category === c"
-            @click="catalog.category = c"
+            :class="{ active: catalog.isCategoryActive(c.slug) }"
+            :aria-pressed="catalog.isCategoryActive(c.slug)"
+            @click="catalog.setFilter(c.slug ? { category: c.slug } : {})"
           >
-            {{ c }}
+            {{ c.label }}
           </button>
           <select class="input sort" aria-label="Ordenar" :value="catalog.sort" @change="onSort">
-            <option value="rel">Destacados</option>
-            <option value="asc">Menor precio</option>
-            <option value="desc">Mayor precio</option>
+            <option value="featured">Destacados</option>
+            <option value="price-asc">Menor precio</option>
+            <option value="price-desc">Mayor precio</option>
           </select>
         </div>
       </div>
 
-      <div v-if="catalog.visibleProducts.length === 0" class="no-results">
-        <span>No encontramos productos para “{{ catalog.query }}”.</span>
-        <button type="button" class="btn btn-ghost" @click="catalog.query = ''">
-          Limpiar búsqueda
+      <div v-if="catalog.status === 'error'" class="message">
+        <span>No pudimos cargar los productos.</span>
+        <button type="button" class="btn btn-ghost" @click="catalog.loadProducts()">
+          Reintentar
         </button>
       </div>
 
+      <div v-else-if="isEmpty" class="message">
+        <template v-if="catalog.isSearching">
+          <span>No encontramos productos para “{{ catalog.query.trim() }}”.</span>
+          <button type="button" class="btn btn-ghost" @click="catalog.query = ''">
+            Limpiar búsqueda
+          </button>
+        </template>
+        <span v-else>Todavía no hay productos acá.</span>
+      </div>
+
       <div class="grid">
-        <ProductCard v-for="p in catalog.visibleProducts" :key="p.id" :product="p" />
+        <ProductCard v-for="p in catalog.products" :key="p.slug" :product="p" />
       </div>
     </section>
   </div>
@@ -129,7 +143,7 @@ function onSort(event: Event) {
   min-width: 150px;
 }
 
-.no-results {
+.message {
   padding: 40px 0;
   display: flex;
   flex-direction: column;

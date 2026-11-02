@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
-import { ALL_CATEGORY, PROMO_SLIDES } from '@/catalog/products'
+import { PROMO_SLIDES } from '@/catalog/promos'
 import { useCatalogStore } from '@/stores/catalog'
 import AppIcon from './AppIcon.vue'
 
@@ -46,10 +46,10 @@ onBeforeUnmount(() => clearInterval(timer))
         <span class="card-kicker kicker">{{ slide.kicker }}</span>
         <span class="title">{{ slide.title }}</span>
         <div class="ctas">
-          <button type="button" class="btn btn-primary" @click="catalog.category = slide.category">
+          <button type="button" class="btn btn-primary" @click="catalog.setFilter(slide.filter)">
             {{ slide.cta }}
           </button>
-          <button type="button" class="btn btn-secondary" @click="catalog.category = ALL_CATEGORY">
+          <button type="button" class="btn btn-secondary" @click="catalog.setFilter({})">
             Toda la tienda
           </button>
         </div>

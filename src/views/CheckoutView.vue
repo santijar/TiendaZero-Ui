@@ -147,9 +147,9 @@ function placeOrder() {
 
       <aside class="card elev-sm summary">
         <span class="summary-title">Resumen · {{ productCountLabel(cart.count) }}</span>
-        <div v-for="l in cart.lines" :key="`${l.id}-${l.size}`" class="line">
+        <div v-for="l in cart.lines" :key="`${l.slug}-${l.size}`" class="line">
           <div class="thumb">
-            <ProductImage :src="l.image" :alt="l.name" placeholder="Foto" />
+            <ProductImage :src="l.imageUrl" :alt="l.name" placeholder="Foto" />
           </div>
           <div class="line-info">
             <span class="line-name">{{ l.name }}</span>
