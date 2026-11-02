@@ -10,6 +10,7 @@ import {
   formatPrice,
   productCountLabel,
 } from '@/lib/commerce'
+import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
 import { useOrderStore } from '@/stores/order'
 
@@ -28,7 +29,14 @@ const orders = useOrderStore()
 
 const delivery = ref<Delivery>('home')
 const payment = ref<PaymentMethod>('mp')
-const form = reactive({ name: '', email: '', address: '', zip: '' })
+// Signed-in shoppers start with their account's name and email filled in.
+const auth = useAuthStore()
+const form = reactive({
+  name: auth.user?.name ?? '',
+  email: auth.user?.email ?? '',
+  address: '',
+  zip: '',
+})
 const formError = ref(false)
 
 const discount = computed(() =>

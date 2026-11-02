@@ -11,6 +11,7 @@ import {
   type Cart,
 } from '@/api/cart'
 import { ApiError } from '@/api/http'
+import { useAuthStore } from './auth'
 
 export interface CartLine {
   id: number
@@ -104,9 +105,15 @@ export const useCartStore = defineStore('cart', () => {
     cart.value = EMPTY_CART
   }
 
-  // Runs a call against the current cart. If the server no longer knows the token (cart expired or
-  // converted), the local cart is dropped; `retryOnNewCart` then repeats the call on a fresh one.
-  async function withCart(call: (token: string) => Promise<Cart>, retryOnNewCart = false) {
+  // Runs a call against the current cart. Signed in, that's the account's cart (no token needed).
+  // As a guest, it's the cart the stored token names: if the server no longer knows the token (cart
+  // expired or converted), the local cart is dropped, and `retryOnNewCart` repeats the call on a
+  // fresh one.
+  async function withCart(call: (token: string | null) => Promise<Cart>, retryOnNewCart = false) {
+    if (useAuthStore().isSignedIn) {
+      cart.value = await call(null)
+      return
+    }
     if (!token && retryOnNewCart) {
       token = await createCart()
       writeToken(token)
@@ -121,10 +128,27 @@ export const useCartStore = defineStore('cart', () => {
     }
   }
 
-  // Loads the stored cart once per page load; later calls reuse the same promise.
+  // Loads the cart once per page load (after the session is restored, so a signed-in shopper gets
+  // their account's cart); later calls reuse the same promise.
   function ensureLoaded(): Promise<void> {
-    loaded ??= withCart(getCart).catch(() => {})
+    loaded ??= useAuthStore()
+      .ready()
+      .then(() => withCart(getCart))
+      .catch(() => {})
     return loaded
+  }
+
+  // The guest cart token, sent along when signing in so the Api moves that cart into the account.
+  function guestToken(): string | null {
+    return token
+  }
+
+  // After signing in or out: the guest cart (if any) is now the account's, or the shopper is a
+  // fresh guest. Either way the old token is done; reload whichever cart applies now.
+  function onSessionChanged(): Promise<void> {
+    forgetCart()
+    loaded = undefined
+    return ensureLoaded()
   }
 
   async function add(product: { slug: string; name: string }, size: string): Promise<boolean> {
@@ -184,6 +208,8 @@ export const useCartStore = defineStore('cart', () => {
     subtotal,
     isEmpty,
     ensureLoaded,
+    guestToken,
+    onSessionChanged,
     add,
     changeQty,
     remove,

@@ -10,16 +10,30 @@ platform (Regate is the first tenant). The backend is a separate repo, TiendaZer
 (milestones 0–6). **Milestone 0 (scaffold + CI) is done.** Milestone 1 is in progress: the
 storefront screens from the design bundle are built (step 1). The catalog (categories,
 collections, product list and detail) comes from the Api (step 2, `src/api/catalog.ts`). The
-cart is the Api's guest cart (step 3, `src/api/cart.ts`). Favorites and checkout are still
-client-only.
+cart comes from the Api (step 3, `src/api/cart.ts`). Customer accounts are built (step 4,
+`src/api/auth.ts`, `src/stores/auth.ts`): `/ingresar`, `/registrarse`, `/recuperar`,
+`/restablecer` and `/cuenta` (profile name and favorites). Checkout is still client-only.
 
 - The home promo carousel is static content in `src/catalog/promos.ts`. Each slide's CTA applies
   a category or collection slug filter.
+- Session: the access token lives only in the auth store's memory. On page load, `auth.ready()`
+  restores the session from the Api's httpOnly refresh cookie. `src/api/http.ts` adds the bearer
+  token to every call and, on a 401 outside `/api/auth/`, refreshes once (one shared refresh for
+  concurrent calls) and retries.
 - The cart store keeps the guest cart token in `localStorage` (`tiendazero.cartToken`). If the
-  Api no longer knows the token, the store drops it and the next add starts a fresh cart.
-- Tests stub `fetch` with an in-memory Api (`src/__tests__/fakeApi.ts`: catalog + cart server).
-  Build a fresh router per mounted app with `createAppRouter(createMemoryHistory())`, because
-  vue-router runs guards in the first app it was installed on.
+  Api no longer knows the token, the store drops it and the next add starts a fresh cart. When
+  signed in, the cart is the account's (no token). Signing in sends the guest token so the Api
+  moves that cart into the account; the store then forgets the token.
+- Favorites are saved to the account when signed in. A guest's favorites last for the visit and
+  are added to the account at sign-in.
+- After sign-in, `?next=` is followed only for same-site paths (`src/lib/navigation.ts`).
+- The auth screens have no design in the bundle. They're built from Nocturne's form pieces in
+  the checkout's frame (`AuthLayout.vue`, `src/assets/forms.css`).
+- Tests stub `fetch` with an in-memory Api (`src/__tests__/fakeApi.ts`: catalog, cart, auth and
+  account). Build a fresh router per mounted app with `createAppRouter(createMemoryHistory())`,
+  because vue-router runs guards in the first app it was installed on. Preload lazily-routed views
+  in `beforeAll` (see `auth.spec.ts`), since `flushPromises` doesn't wait for a first dynamic
+  import.
 
 - Nocturne tokens/classes live in `src/assets/nocturne.css`, a verbatim copy of the bundle's
   `styles.css`. Re-copy it rather than editing it.
