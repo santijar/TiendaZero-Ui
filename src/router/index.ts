@@ -2,7 +2,6 @@ import { createRouter, createWebHistory, type RouterHistory } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
-import { useOrderStore } from '@/stores/order'
 import HomeView from '@/views/HomeView.vue'
 
 // Sign-in and sign-up pages send an already signed-in shopper to their account.
@@ -38,10 +37,10 @@ export function createAppRouter(
         },
       },
       {
-        path: '/pedido-confirmado',
-        name: 'order-confirmed',
-        component: () => import('@/views/OrderConfirmedView.vue'),
-        beforeEnter: () => (useOrderStore().lastOrder ? true : { name: 'home' }),
+        path: '/pedido/:number',
+        name: 'order',
+        component: () => import('@/views/OrderView.vue'),
+        props: true,
       },
       {
         path: '/ingresar',

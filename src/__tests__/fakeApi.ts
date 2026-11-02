@@ -2,6 +2,7 @@ import { vi } from 'vitest'
 
 import type { Cart, CartItem } from '../api/cart'
 import type { Category, ProductDetail, ProductSummary } from '../api/catalog'
+import type { Order } from '../api/orders'
 
 export const CATEGORIES: Category[] = [
   { slug: 'camisetas', name: 'Camisetas' },
@@ -226,6 +227,125 @@ function createAuthServer(cartServer: ReturnType<typeof createCartServer>) {
   }
 }
 
+// A minimal orders server: placing an order converts the cart (its key stops working), and tests
+// can change an order's state directly (e.g. mark it paid, as a webhook would).
+function createOrderServer(cartServer: ReturnType<typeof createCartServer>) {
+  const orders = new Map<string, Order & { token: string; owner: string | null }>()
+  const state = {
+    placed: [] as { body: Record<string, unknown>; idempotencyKey: string | null }[],
+    syncs: 0,
+    // When set, POST /api/orders answers with this instead of placing an order.
+    refuse: null as { status: number; body: unknown } | null,
+    checkoutDown: false,
+    // Called on every sync, like Mercado Pago reporting a payment.
+    onSync: null as ((order: Order) => void) | null,
+  }
+
+  const visible = (number: string, token: string | null, email: string | null) => {
+    const order = orders.get(number)
+    if (!order) return null
+    return (order.owner && order.owner === email) || order.token === token ? order : null
+  }
+  const dto = (order: Order & { token: string; owner: string | null }): Order => {
+    const { token: _token, owner: _owner, ...rest } = order
+    return rest
+  }
+
+  return {
+    orders,
+    state,
+    handle(
+      method: string,
+      path: string,
+      headers: Headers,
+      email: string | null,
+      body: Record<string, unknown>,
+    ) {
+      if (path === '/api/account/orders') {
+        const mine = [...orders.values()].filter((o) => o.owner === email)
+        return json(
+          mine.map((o) => ({
+            number: o.number,
+            status: o.status,
+            paymentMethod: o.paymentMethod,
+            itemCount: o.lines.reduce((n, l) => n + l.quantity, 0),
+            total: o.total,
+            createdAt: o.createdAt,
+          })),
+        )
+      }
+      if (method === 'POST' && path === '/api/orders') {
+        state.placed.push({ body, idempotencyKey: headers.get('Idempotency-Key') })
+        if (state.refuse) return json(state.refuse.body, state.refuse.status)
+        const cartKey = email ? `user:${email}` : headers.get('X-Cart-Token')
+        const items = cartKey ? cartServer.carts.get(cartKey) : undefined
+        if (!items?.length) return json({ detail: 'Tu carrito está vacío.' }, 422)
+        const subtotal = items.reduce((n, i) => n + i.lineTotal, 0)
+        const transfer = body.paymentMethod === 'transfer'
+        const discount = transfer ? subtotal * 0.1 : 0
+        const number = `RG-${20001 + orders.size}`
+        const order = {
+          number,
+          status: 'pending' as const,
+          paymentMethod: transfer ? ('transfer' as const) : ('mercadopago' as const),
+          delivery: body.delivery as 'home' | 'pickup',
+          email: String(body.email),
+          customerName: String(body.name),
+          shippingAddress: (body.address as Order['shippingAddress']) ?? null,
+          lines: items.map((i) => ({
+            productSlug: i.productSlug,
+            name: i.name,
+            size: i.size,
+            color: i.color,
+            imageUrl: i.imageUrl,
+            unitPrice: i.unitPrice,
+            quantity: i.quantity,
+            lineTotal: i.lineTotal,
+          })),
+          subtotal,
+          shippingCost: 0,
+          discount,
+          total: subtotal - discount,
+          createdAt: '2026-11-02T15:00:00Z',
+          expiresAt: transfer ? '2026-11-04T15:00:00Z' : '2026-11-02T15:30:00Z',
+          paidAt: null,
+          transfer: transfer
+            ? {
+                alias: 'REGATE.TIENDA.DEMO',
+                cbu: '0000003100000000000000',
+                holder: 'Regate',
+                bank: 'Banco',
+              }
+            : null,
+          lastPaymentStatus: null,
+          token: `order-token-${orders.size + 1}`,
+          owner: email,
+        }
+        orders.set(number, order)
+        // The cart is converted: a guest token no longer names a cart; an account starts empty.
+        if (email) cartServer.carts.set(cartKey!, [])
+        else cartServer.carts.delete(cartKey!)
+        return json({ order: dto(order), accessToken: order.token }, 201)
+      }
+
+      const match = /^\/api\/orders\/([^/]+)(\/checkout|\/sync)?$/.exec(path)
+      const order = match
+        ? visible(decodeURIComponent(match[1]!), headers.get('X-Order-Token'), email)
+        : null
+      if (!order) return json({ status: 404 }, 404)
+      if (match![2] === '/checkout') {
+        if (state.checkoutDown) return json({ detail: 'Mercado Pago no responde.' }, 502)
+        return json({ url: `https://mercadopago.example/checkout/${order.number}` })
+      }
+      if (match![2] === '/sync') {
+        state.syncs++
+        state.onSync?.(order)
+      }
+      return json(dto(order))
+    },
+  }
+}
+
 export type FakeApi = ReturnType<typeof stubApi>
 
 // Stubs `fetch` with a tiny in-memory version of the Api (catalog, cart, auth, account). Returns
@@ -233,6 +353,7 @@ export type FakeApi = ReturnType<typeof stubApi>
 export function stubApi() {
   const cartServer = createCartServer()
   const authServer = createAuthServer(cartServer)
+  const orderServer = createOrderServer(cartServer)
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
     const url = new URL(String(input), 'http://localhost')
     const method = init?.method ?? 'GET'
@@ -245,6 +366,10 @@ export function stubApi() {
     // Like the Api: a bearer token that doesn't validate is a 401 on every endpoint.
     const email = authServer.emailFor(headers.get('Authorization'))
     if (email === 'invalid') return json({ status: 401 }, 401)
+    if (url.pathname.startsWith('/api/orders') || url.pathname === '/api/account/orders') {
+      if (url.pathname === '/api/account/orders' && !email) return json({}, 401)
+      return orderServer.handle(method, url.pathname, headers, email, body)
+    }
     if (url.pathname.startsWith('/api/account')) {
       return email ? authServer.handleAccount(method, url.pathname, email, body) : json({}, 401)
     }
@@ -264,5 +389,5 @@ export function stubApi() {
     return json({ status: 404 }, 404)
   })
   vi.stubGlobal('fetch', fetchMock)
-  return { fetchMock, carts: cartServer.carts, auth: authServer }
+  return { fetchMock, carts: cartServer.carts, auth: authServer, orders: orderServer }
 }
