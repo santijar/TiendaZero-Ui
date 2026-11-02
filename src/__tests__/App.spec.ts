@@ -1,14 +1,20 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createMemoryHistory, type Router } from 'vue-router'
 
 import App from '../App.vue'
-import router from '../router'
-import { PRODUCTS, stubCatalogApi } from './fakeApi'
+import { createAppRouter } from '../router'
+import { PRODUCTS, stubApi } from './fakeApi'
 
+let router: Router
+
+// Each mount is a fresh app: new Pinia and a new router, like a page reload. The stubbed API
+// (and localStorage) persist across mounts within one test.
 async function mountAt(path: string) {
   const pinia = createPinia()
   setActivePinia(pinia)
+  router = createAppRouter(createMemoryHistory())
   await router.push(path)
   const wrapper = mount(App, { global: { plugins: [pinia, router] }, attachTo: document.body })
   await flushPromises()
@@ -16,10 +22,10 @@ async function mountAt(path: string) {
 }
 
 describe('App', () => {
-  beforeEach(async () => {
-    stubCatalogApi()
+  beforeEach(() => {
+    stubApi()
+    localStorage.clear()
     document.body.innerHTML = ''
-    await router.replace('/')
   })
 
   afterEach(() => vi.unstubAllGlobals())
@@ -64,8 +70,44 @@ describe('App', () => {
 
     await sizes[1]!.trigger('click')
     await add.trigger('click')
+    await flushPromises()
     expect(wrapper.find('.cart').text()).toBe('1')
     expect(wrapper.text()).toContain('Camiseta Titular 26 · Talle M agregado')
+  })
+
+  it('stops the drawer stepper at the stock limit', async () => {
+    const wrapper = await mountAt('/producto/cam-titular')
+    await wrapper.findAll('[role="radio"]')[2]!.trigger('click') // L: 2 in stock
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Agregar al carrito')!
+      .trigger('click')
+    await flushPromises()
+
+    await wrapper.find('.cart').trigger('click')
+    const more = wrapper.find('[aria-label="Más"]')
+    expect(more.attributes('disabled')).toBeUndefined()
+
+    await more.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.stepper').text()).toBe('2')
+    expect(wrapper.find('[aria-label="Más"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('keeps the cart across reloads and lets checkout open', async () => {
+    const first = await mountAt('/producto/cam-titular')
+    await first.findAll('[role="radio"]')[1]!.trigger('click')
+    await first
+      .findAll('button')
+      .find((b) => b.text() === 'Agregar al carrito')!
+      .trigger('click')
+    await flushPromises()
+    first.unmount()
+
+    await mountAt('/checkout')
+
+    expect(router.currentRoute.value.name).toBe('checkout')
+    expect(document.body.textContent).toContain('Resumen · 1 producto')
   })
 
   it('redirects to home when opening checkout with an empty cart', async () => {
@@ -89,7 +131,7 @@ describe('App', () => {
 
     expect(wrapper.text()).toContain('No pudimos cargar los productos.')
 
-    stubCatalogApi()
+    stubApi()
     await wrapper
       .findAll('button')
       .find((b) => b.text() === 'Reintentar')!

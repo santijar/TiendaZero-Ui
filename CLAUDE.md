@@ -10,12 +10,16 @@ platform (Regate is the first tenant). The backend is a separate repo, TiendaZer
 (milestones 0–6). **Milestone 0 (scaffold + CI) is done.** Milestone 1 is in progress: the
 storefront screens from the design bundle are built (step 1). The catalog (categories,
 collections, product list and detail) comes from the Api (step 2, `src/api/catalog.ts`). The
-cart, favorites and checkout are still client-only Pinia stores; the cart keeps a snapshot of
-each product it holds.
+cart is the Api's guest cart (step 3, `src/api/cart.ts`). Favorites and checkout are still
+client-only.
 
 - The home promo carousel is static content in `src/catalog/promos.ts`. Each slide's CTA applies
   a category or collection slug filter.
-- Tests stub `fetch` with an in-memory catalog API (`src/__tests__/fakeApi.ts`).
+- The cart store keeps the guest cart token in `localStorage` (`tiendazero.cartToken`). If the
+  Api no longer knows the token, the store drops it and the next add starts a fresh cart.
+- Tests stub `fetch` with an in-memory Api (`src/__tests__/fakeApi.ts`: catalog + cart server).
+  Build a fresh router per mounted app with `createAppRouter(createMemoryHistory())`, because
+  vue-router runs guards in the first app it was installed on.
 
 - Nocturne tokens/classes live in `src/assets/nocturne.css`, a verbatim copy of the bundle's
   `styles.css`. Re-copy it rather than editing it.

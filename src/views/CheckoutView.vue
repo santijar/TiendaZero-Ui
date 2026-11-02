@@ -40,15 +40,16 @@ function clearError() {
   formError.value = false
 }
 
-function placeOrder() {
+async function placeOrder() {
   const missingAddress = delivery.value === 'home' && !form.address.trim()
   if (!form.name.trim() || !form.email.trim() || missingAddress) {
     formError.value = true
     return
   }
   orders.place(form.email.trim())
-  cart.clear()
-  router.push({ name: 'order-confirmed' })
+  // Stand-in until orders exist (step 5): placing an order just empties the server cart.
+  await cart.clear().catch(() => {})
+  await router.push({ name: 'order-confirmed' })
 }
 </script>
 
@@ -147,7 +148,7 @@ function placeOrder() {
 
       <aside class="card elev-sm summary">
         <span class="summary-title">Resumen · {{ productCountLabel(cart.count) }}</span>
-        <div v-for="l in cart.lines" :key="`${l.slug}-${l.size}`" class="line">
+        <div v-for="l in cart.lines" :key="l.id" class="line">
           <div class="thumb">
             <ProductImage :src="l.imageUrl" :alt="l.name" placeholder="Foto" />
           </div>

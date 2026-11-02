@@ -6,10 +6,22 @@ const cart = useCartStore()
 </script>
 
 <template>
-  <div v-if="cart.toast" class="toast" role="status">
-    <AppIcon name="check" :stroke-width="20" class="check" />
-    <span>{{ cart.toast }}</span>
-    <button type="button" class="btn btn-ghost" @click="cart.open">Ver carrito</button>
+  <div v-if="cart.toast" class="toast" :role="cart.toast.kind === 'error' ? 'alert' : 'status'">
+    <AppIcon
+      :name="cart.toast.kind === 'error' ? 'x' : 'check'"
+      :stroke-width="20"
+      class="icon"
+      :class="cart.toast.kind"
+    />
+    <span>{{ cart.toast.message }}</span>
+    <button
+      v-if="cart.toast.kind === 'success'"
+      type="button"
+      class="btn btn-ghost"
+      @click="cart.open"
+    >
+      Ver carrito
+    </button>
   </div>
 </template>
 
@@ -30,8 +42,13 @@ const cart = useCartStore()
   font-size: 13px;
 }
 
-.check {
+.icon {
   flex: none;
   color: var(--color-accent);
+}
+
+/* Same deep accent step the design uses for inline errors ("Elegí un talle…"). */
+.icon.error {
+  color: var(--color-accent-300);
 }
 </style>
