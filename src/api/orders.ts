@@ -49,6 +49,9 @@ export interface Order {
   transfer: TransferDetails | null
   // Mercado Pago's status for the latest payment attempt ("approved", "rejected", "in_process", ...).
   lastPaymentStatus: string | null
+  // Where a paid order is on its way; set by the store.
+  fulfillment: 'unfulfilled' | 'preparing' | 'shipped' | 'ready-for-pickup' | 'delivered'
+  trackingInfo: string | null
 }
 
 export interface PlacedOrder {

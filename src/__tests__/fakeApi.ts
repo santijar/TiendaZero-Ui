@@ -2,6 +2,7 @@ import { vi } from 'vitest'
 
 import type { Cart, CartItem } from '../api/cart'
 import type { Category, ProductDetail, ProductSummary } from '../api/catalog'
+import type { AdminProduct, SaveProduct } from '../api/admin'
 import type { Order } from '../api/orders'
 
 export const CATEGORIES: Category[] = [
@@ -136,6 +137,7 @@ interface FakeUser {
   name: string
   password: string
   favorites: string[]
+  roles?: string[]
 }
 
 // A minimal auth server: users, the refresh cookie (one per test "browser"), and access tokens that
@@ -153,7 +155,7 @@ function createAuthServer(cartServer: ReturnType<typeof createCartServer>) {
     return {
       accessToken,
       expiresAt: '2099-01-01T00:00:00Z',
-      user: { id: user.id, email, name: user.name, roles: ['Customer'] },
+      user: { id: user.id, email, name: user.name, roles: user.roles ?? ['Customer'] },
     }
   }
   const adoptGuestCart = (email: string, cartToken: string | null) => {
@@ -318,6 +320,8 @@ function createOrderServer(cartServer: ReturnType<typeof createCartServer>) {
               }
             : null,
           lastPaymentStatus: null,
+          fulfillment: 'unfulfilled' as const,
+          trackingInfo: null,
           token: `order-token-${orders.size + 1}`,
           owner: email,
         }
@@ -346,6 +350,147 @@ function createOrderServer(cartServer: ReturnType<typeof createCartServer>) {
   }
 }
 
+// A minimal /api/admin: orders (sharing the order server's orders) and an editable product whose
+// stock version tests can bump, as a sale would.
+function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
+  const product: AdminProduct = {
+    id: 1,
+    slug: 'cam-titular',
+    name: 'Camiseta Titular 26',
+    description: 'Tela dry-fit liviana.',
+    price: 48900,
+    color: 'Negro',
+    badge: 'Nuevo',
+    categoryId: 1,
+    collectionIds: [],
+    isActive: true,
+    sortOrder: 1,
+    variants: [
+      { id: 11, size: 'S', sku: 'CAM-TITULAR-S', stock: 5, version: 1 },
+      { id: 12, size: 'M', sku: 'CAM-TITULAR-M', stock: 8, version: 1 },
+    ],
+    images: [],
+  }
+  const state = {
+    product,
+    saves: [] as SaveProduct[],
+    created: [] as SaveProduct[],
+  }
+
+  const adminOrder = (o: Order & { token: string; owner: string | null }) => {
+    const { token: _token, owner: _owner, ...order } = o
+    const path =
+      order.delivery === 'pickup'
+        ? ['unfulfilled', 'preparing', 'ready-for-pickup', 'delivered']
+        : ['unfulfilled', 'preparing', 'shipped', 'delivered']
+    return {
+      order,
+      signedIn: o.owner !== null,
+      needsReview: false,
+      reviewNotes: null,
+      payments: [],
+      nextFulfillment:
+        order.status === 'paid' ? path.slice(path.indexOf(order.fulfillment) + 1) : [],
+      canMarkPaid: order.paymentMethod === 'transfer' && order.status !== 'paid',
+    }
+  }
+
+  return {
+    state,
+    handle(method: string, path: string, body: Record<string, unknown>) {
+      if (path === '/api/admin/categories') {
+        return json([
+          { id: 1, slug: 'camisetas', name: 'Camisetas', sortOrder: 1, productCount: 1 },
+        ])
+      }
+      if (path === '/api/admin/collections') return json([])
+      if (path === '/api/admin/products' && method === 'GET') {
+        const p = state.product
+        return json({
+          items: [
+            {
+              id: p.id,
+              slug: p.slug,
+              name: p.name,
+              categoryName: 'Camisetas',
+              price: p.price,
+              isActive: p.isActive,
+              totalStock: p.variants.reduce((n, v) => n + v.stock, 0),
+              imageUrl: null,
+            },
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 50,
+        })
+      }
+      if (path === '/api/admin/products' && method === 'POST') {
+        state.created.push(body as unknown as SaveProduct)
+        return json({ ...state.product, ...body, id: 2, variants: [], images: [] }, 201)
+      }
+      if (path === '/api/admin/products/1' && method === 'GET') return json(state.product)
+      if (path === '/api/admin/products/2' && method === 'GET') {
+        return json({ ...state.product, id: 2, name: 'Nuevo' })
+      }
+      if (path === '/api/admin/products/1' && method === 'PUT') {
+        const save = body as unknown as SaveProduct
+        state.saves.push(save)
+        for (const v of save.variants) {
+          const current = state.product.variants.find((c) => c.id === v.id)
+          if (
+            current &&
+            v.stock !== null &&
+            v.stock !== current.stock &&
+            v.version !== current.version
+          ) {
+            return json({ detail: 'El stock cambió mientras editabas (hubo ventas).' }, 409)
+          }
+        }
+        state.product = {
+          ...state.product,
+          name: save.name,
+          variants: save.variants.map((v, i) => {
+            const current = state.product.variants.find((c) => c.id === v.id)
+            return {
+              id: v.id ?? 100 + i,
+              size: v.size,
+              sku: v.sku,
+              stock: v.stock ?? current?.stock ?? 0,
+              version: (current?.version ?? 0) + 1,
+            }
+          }),
+        }
+        return json(state.product)
+      }
+
+      if (path === '/api/admin/orders') {
+        const items = [...orderServer.orders.values()].map((o) => ({
+          number: o.number,
+          createdAt: o.createdAt,
+          customerName: o.customerName,
+          email: o.email,
+          paymentMethod: o.paymentMethod,
+          status: o.status,
+          fulfillment: o.fulfillment,
+          needsReview: false,
+          itemCount: o.lines.reduce((n, l) => n + l.quantity, 0),
+          total: o.total,
+        }))
+        return json({ items, total: items.length, page: 1, pageSize: 50 })
+      }
+      const match = /^\/api\/admin\/orders\/([^/]+)(?:\/([a-z-]+))?$/.exec(path)
+      const order = match ? orderServer.orders.get(decodeURIComponent(match[1]!)) : undefined
+      if (!order) return json({ status: 404 }, 404)
+      if (match![2] === 'mark-paid') order.status = 'paid'
+      if (match![2] === 'fulfillment') {
+        order.fulfillment = body.status as Order['fulfillment']
+        order.trackingInfo = (body.trackingInfo as string | null) ?? order.trackingInfo
+      }
+      return json(adminOrder(order))
+    },
+  }
+}
+
 export type FakeApi = ReturnType<typeof stubApi>
 
 // Stubs `fetch` with a tiny in-memory version of the Api (catalog, cart, auth, account). Returns
@@ -354,6 +499,7 @@ export function stubApi() {
   const cartServer = createCartServer()
   const authServer = createAuthServer(cartServer)
   const orderServer = createOrderServer(cartServer)
+  const adminServer = createAdminServer(orderServer)
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
     const url = new URL(String(input), 'http://localhost')
     const method = init?.method ?? 'GET'
@@ -366,6 +512,12 @@ export function stubApi() {
     // Like the Api: a bearer token that doesn't validate is a 401 on every endpoint.
     const email = authServer.emailFor(headers.get('Authorization'))
     if (email === 'invalid') return json({ status: 401 }, 401)
+    if (url.pathname.startsWith('/api/admin/')) {
+      if (!email) return json({}, 401)
+      const roles = api.auth.users.get(email)?.roles ?? []
+      if (!roles.includes('TenantAdmin')) return json({}, 403)
+      return adminServer.handle(method, url.pathname, body)
+    }
     if (url.pathname.startsWith('/api/orders') || url.pathname === '/api/account/orders') {
       if (url.pathname === '/api/account/orders' && !email) return json({}, 401)
       return orderServer.handle(method, url.pathname, headers, email, body)
@@ -389,5 +541,12 @@ export function stubApi() {
     return json({ status: 404 }, 404)
   })
   vi.stubGlobal('fetch', fetchMock)
-  return { fetchMock, carts: cartServer.carts, auth: authServer, orders: orderServer }
+  const api = {
+    fetchMock,
+    carts: cartServer.carts,
+    auth: authServer,
+    orders: orderServer,
+    admin: adminServer,
+  }
+  return api
 }

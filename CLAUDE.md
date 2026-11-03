@@ -21,6 +21,17 @@ The order page also opens from the emailed link (`?token=`, remembered in localS
 syncs with the Api, because Mercado Pago offers no way back to a non-public address and shoppers
 close tabs. When it's opened from Mercado Pago's return (`payment_id`/`collection_status` in the
 query), it also polls briefly while the payment is still pending.
+Paid orders show their fulfillment progress.
+
+The store admin (step 6) lives under `/admin`, for `TenantAdmin`/`PlatformAdmin` users
+(`auth.isAdmin`); everyone else gets the 404 page. Routes with `meta.admin` render
+`AdminLayout` (its own sidebar shell) instead of the storefront's header, footer and cart. The
+screens are orders (`/admin/pedidos`, detail with confirm-transfer and fulfillment actions),
+products (`/admin/productos`, editor with sizes/stock and photo upload) and categories and
+collections (`/admin/catalogo`). The client is `src/api/admin.ts`. The product editor sends a
+size's stock only when it was edited; on a 409 it offers to pull the current stock. The admin has
+no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` and `.tag`
+(`src/assets/admin.css`).
 
 - The home promo carousel is static content in `src/catalog/promos.ts`. Each slide's CTA applies
   a category or collection slug filter.
@@ -38,7 +49,7 @@ query), it also polls briefly while the payment is still pending.
 - The auth screens have no design in the bundle. They're built from Nocturne's form pieces in
   the checkout's frame (`AuthLayout.vue`, `src/assets/forms.css`).
 - Tests stub `fetch` with an in-memory Api (`src/__tests__/fakeApi.ts`: catalog, cart, auth,
-  account and orders). Build a fresh router per mounted app with `createAppRouter(createMemoryHistory())`,
+  account, orders and admin). Build a fresh router per mounted app with `createAppRouter(createMemoryHistory())`,
   because vue-router runs guards in the first app it was installed on. Preload lazily-routed views
   in `beforeAll` (see `auth.spec.ts`), since `flushPromises` doesn't wait for a first dynamic
   import.

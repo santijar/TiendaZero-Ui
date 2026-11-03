@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { RouterView } from 'vue-router'
+import { computed, onMounted } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
 
 import AddedToast from '@/components/AddedToast.vue'
 import AppFooter from '@/components/AppFooter.vue'
@@ -12,6 +12,9 @@ import { useCatalogStore } from '@/stores/catalog'
 import { useFavoritesStore } from '@/stores/favorites'
 
 const catalog = useCatalogStore()
+const route = useRoute()
+// The admin brings its own shell (AdminLayout) instead of the storefront's.
+const inAdmin = computed(() => route.matched.some((r) => r.meta.admin))
 
 onMounted(() => {
   // Without categories the header only offers "Todo"; the store still works, so don't block on it.
@@ -29,7 +32,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="shell">
+  <RouterView v-if="inAdmin" />
+  <div v-else class="shell">
     <AppHeader />
     <main>
       <RouterView />
