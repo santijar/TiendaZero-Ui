@@ -59,6 +59,34 @@ const paymentNote = computed(() => {
   }
 })
 
+// A paid order's way to the shopper, as the store moves it along.
+const fulfillmentSteps = computed(() => [
+  { key: 'paid', label: 'Pagado' },
+  { key: 'preparing', label: 'Preparando' },
+  order.value?.delivery === 'pickup'
+    ? { key: 'ready-for-pickup', label: 'Listo para retirar' }
+    : { key: 'shipped', label: 'En camino' },
+  { key: 'delivered', label: 'Entregado' },
+])
+const fulfillmentAt = computed(() => {
+  const at = fulfillmentSteps.value.findIndex((s) => s.key === order.value?.fulfillment)
+  return at < 0 ? 0 : at
+})
+const fulfillmentTitle = computed(() => {
+  switch (order.value?.fulfillment) {
+    case 'preparing':
+      return 'Estamos preparando tu pedido'
+    case 'shipped':
+      return 'Tu pedido está en camino'
+    case 'ready-for-pickup':
+      return 'Tu pedido está listo para retirar'
+    case 'delivered':
+      return '¡Pedido entregado!'
+    default:
+      return '¡Pedido confirmado!'
+  }
+})
+
 function stillWaitingOnMercadoPago(o: Order) {
   return o.status === 'pending' && o.paymentMethod === 'mercadopago'
 }
@@ -173,12 +201,31 @@ onBeforeUnmount(() => {
       <div class="head">
         <template v-if="order.status === 'paid'">
           <div class="badge"><AppIcon name="check" :size="28" :stroke-width="18" /></div>
-          <h1>¡Pedido confirmado!</h1>
+          <h1>{{ fulfillmentTitle }}</h1>
           <p class="lead">
-            Te enviamos el detalle a {{ order.email }}. Número de pedido
-            <span>{{ order.number }}</span
+            <template v-if="order.fulfillment === 'unfulfilled'">
+              Te enviamos el detalle a {{ order.email }}.
+            </template>
+            <template v-else-if="order.fulfillment === 'ready-for-pickup'">
+              Retiralo en el showroom, de lunes a viernes de 10 a 19 h.
+            </template>
+            Número de pedido <span>{{ order.number }}</span
             >.
+            <template v-if="order.fulfillment === 'shipped' && order.trackingInfo">
+              Seguimiento: <span>{{ order.trackingInfo }}</span
+              >.
+            </template>
           </p>
+          <ol class="progress" aria-label="Estado del pedido">
+            <li
+              v-for="(step, i) in fulfillmentSteps"
+              :key="step.key"
+              :class="{ done: i <= fulfillmentAt }"
+              :aria-current="i === fulfillmentAt ? 'step' : undefined"
+            >
+              {{ step.label }}
+            </li>
+          </ol>
         </template>
 
         <template v-else-if="order.status === 'expired'">
@@ -336,6 +383,38 @@ p {
 
 .lead span {
   color: var(--color-text);
+}
+
+.progress {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 0;
+  font-size: 12px;
+  color: var(--color-neutral-500);
+}
+
+.progress li {
+  display: flex;
+  align-items: center;
+}
+
+.progress li + li::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  margin: 0 8px;
+  background: var(--color-divider);
+}
+
+.progress li.done {
+  color: var(--color-text);
+}
+
+.progress li.done + li.done::before {
+  background: var(--color-accent);
 }
 
 .head > .btn,

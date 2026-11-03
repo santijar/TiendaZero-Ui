@@ -24,6 +24,8 @@ export class ApiError extends Error {
 
 export interface RequestOptions {
   body?: unknown
+  // Sent as multipart/form-data instead of JSON (file uploads).
+  form?: FormData
   headers?: Record<string, string>
   signal?: AbortSignal
 }
@@ -42,17 +44,17 @@ export function configureAuth(hooks: AuthHooks | null) {
 }
 
 async function send(method: string, path: string, options: RequestOptions): Promise<Response> {
-  const { body, headers, signal } = options
+  const { body, form, headers, signal } = options
   const token = auth?.accessToken()
   return fetch(path, {
     method,
     headers: {
       Accept: 'application/json',
-      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      ...(body === undefined || form ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: form ?? (body === undefined ? undefined : JSON.stringify(body)),
     signal,
   })
 }

@@ -20,6 +20,10 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   let accessToken: string | null = null
   const isSignedIn = computed(() => user.value !== null)
+  // Store admins (TenantAdmin; a PlatformAdmin may too) get the /admin screens.
+  const isAdmin = computed(
+    () => !!user.value?.roles.some((r) => r === 'TenantAdmin' || r === 'PlatformAdmin'),
+  )
 
   let restoring: Promise<void> | undefined
   let refreshing: Promise<boolean> | undefined
@@ -81,5 +85,5 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = await updateProfile(name)
   }
 
-  return { user, isSignedIn, ready, signIn, signUp, signOut, saveName }
+  return { user, isSignedIn, isAdmin, ready, signIn, signUp, signOut, saveName }
 })

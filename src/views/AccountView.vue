@@ -6,6 +6,7 @@ import { ApiError } from '@/api/http'
 import { getMyOrders, type OrderSummary } from '@/api/orders'
 import ProductCard from '@/components/ProductCard.vue'
 import { formatPrice, productCountLabel } from '@/lib/commerce'
+import { STATUS_LABELS, formatDate as orderDate } from '@/lib/orderLabels'
 import { useAuthStore } from '@/stores/auth'
 import { useFavoritesStore } from '@/stores/favorites'
 
@@ -19,20 +20,6 @@ const nameError = ref<string | null>(null)
 const favoritesFailed = ref(false)
 const orders = ref<OrderSummary[] | null>(null)
 const ordersFailed = ref(false)
-
-const STATUS_LABELS: Record<OrderSummary['status'], string> = {
-  pending: 'Pendiente de pago',
-  paid: 'Pagado',
-  expired: 'Vencido',
-}
-
-function orderDate(iso: string) {
-  return new Date(iso).toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
-}
 
 onMounted(() => {
   favorites.load().catch(() => (favoritesFailed.value = true))
@@ -64,7 +51,12 @@ async function signOut() {
   <div class="account">
     <div class="head">
       <h1>Mi cuenta</h1>
-      <button type="button" class="btn btn-ghost" @click="signOut">Cerrar sesión</button>
+      <div class="head-actions">
+        <RouterLink v-if="auth.isAdmin" :to="{ name: 'admin-orders' }" class="btn btn-secondary">
+          Administrar la tienda
+        </RouterLink>
+        <button type="button" class="btn btn-ghost" @click="signOut">Cerrar sesión</button>
+      </div>
     </div>
 
     <section class="section">
@@ -144,6 +136,12 @@ async function signOut() {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .head h1 {
