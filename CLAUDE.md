@@ -93,8 +93,26 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
   background (size, margin, filter and blend from the theme; with no blend set, a Dark store's logo uses
   `lighten`, a Light store's `normal`), else the wordmark, with the monogram badge when there is neither;
   `AppFooter` shows `© year footerLegalName` and the first social link. Still Regate-specific, on purpose (later
-  work): the home promo slides (`src/catalog/promos.ts`), the checkout's pickup text and the admin's sidebar logo.
+  work): the home promo slides (`src/catalog/promos.ts`) and the checkout's pickup text.
   Tests: `theme.spec.ts`; `fakeApi.ts` has `REGATE_THEME`/`INDIANS_THEME` and `api.theme.current`.
+- Branding editor (Milestone 3, slice 4): `/admin/marca` (`AdminThemeView.vue`, "Marca" in the admin sidebar, client in
+  `src/api/admin.ts`). It edits the store name and legal name, mode, accent hue (or keeps Regate's hand-picked
+  accent), logo and favicon (uploaded, not typed), the logo's display settings, text mark and monogram, up to four
+  footer links, and the email accent and logo. The preview is a box that gets the Api's variables for the
+  chosen mode (`POST /api/admin/theme/preview`, debounced 250 ms; the Ui still does no OKLCH math) and is not
+  applied to the page. The **contrast check** (`src/lib/contrast.ts`, WCAG on the resolved hex values) shows the
+  accent against the background and cards (3:1, Nocturne's rule) and the accent's text-on-tint pair (4.5:1) in
+  both modes, and warns (never blocks) for the mode being edited. After a save or an upload, the theme store
+  reloads so the storefront and the admin shell wear the new look at once. The admin sidebar shows the store's name
+  instead of the old bundled Regate logo (removed). `logoStyle.ts` is shared with the header.
+  Tests: `adminTheme.spec.ts`; the fake Api's `api.admin.theme` records saves, previews and uploads.
+- **Changing Nocturne's tokens** (docs/plan.md §3 risk: two palettes to keep in sync). A new or retuned token needs a
+  decision for each ground, then: (1) `src/assets/nocturne.css` stays a verbatim copy of the bundle's file, so
+  re-copy it; (2) if it is chromatic or ground-dependent (bg, surface, text, divider, neutral steps, shadows,
+  accent), add it to both `ThemeRamp.Dark` and `ThemeRamp.Light` in the Api (a test fails if their keys differ) and
+  keep the light neutrals on the dark ramp's lightness scale; (3) if it is structural (font, space, radius,
+  component class), leave it fixed for every tenant and in neither palette; (4) if the contrast check should
+  cover a new pairing, add it to `CHECKS` in `src/lib/contrast.ts`; (5) update both copies of `docs/plan.md`.
 - `design/` is excluded from oxlint and ESLint (`.oxlintrc.json`, `eslint.config.ts`). It's
   reference material, not app code.
 

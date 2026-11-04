@@ -121,6 +121,11 @@ export function createAppRouter(
             name: 'admin-taxonomy',
             component: () => import('@/views/admin/AdminTaxonomyView.vue'),
           },
+          {
+            path: 'marca',
+            name: 'admin-theme',
+            component: () => import('@/views/admin/AdminThemeView.vue'),
+          },
         ],
       },
       {
