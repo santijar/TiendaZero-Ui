@@ -1,7 +1,18 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+
+import { useThemeStore } from '@/stores/theme'
+
+const theme = computed(() => useThemeStore().theme)
+// The first social link, as in the design; the theme may carry more for later.
+const social = computed(() => theme.value?.socialLinks[0] ?? null)
+const year = new Date().getFullYear()
+</script>
+
 <template>
   <footer class="footer">
-    <span>© 2026 Regate Indumentaria</span>
-    <a href="https://www.instagram.com/regate.indumentaria/">@regate.indumentaria</a>
+    <span v-if="theme">© {{ year }} {{ theme.footerLegalName }}</span>
+    <a v-if="social" :href="social.url" rel="noopener">{{ social.label }}</a>
   </footer>
 </template>
 

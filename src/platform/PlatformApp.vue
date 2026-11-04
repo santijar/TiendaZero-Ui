@@ -6,6 +6,7 @@ import AppFooter from '@/components/AppFooter.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import { useCatalogStore } from '@/stores/catalog'
 import { usePlatformStore } from '@/stores/platform'
+import { useThemeStore } from '@/stores/theme'
 import PlatformTenantBar from './PlatformTenantBar.vue'
 
 const platform = usePlatformStore()
@@ -23,7 +24,15 @@ async function reload() {
 watch(
   () => [platform.isSignedIn, platform.previewSlug] as const,
   ([signedIn, slug]) => {
-    if (signedIn && slug) void reload()
+    if (signedIn && slug) {
+      // The previewed store's own branding (the Api answers /api/theme as that store), not the platform's.
+      useThemeStore()
+        .load()
+        .catch(() => {})
+      void reload()
+    } else {
+      useThemeStore().reset()
+    }
   },
   { immediate: true },
 )

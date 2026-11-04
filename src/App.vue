@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
 import { useCatalogStore } from '@/stores/catalog'
 import { useFavoritesStore } from '@/stores/favorites'
+import { useThemeStore } from '@/stores/theme'
 
 const catalog = useCatalogStore()
 const route = useRoute()
@@ -17,6 +18,10 @@ const route = useRoute()
 const inAdmin = computed(() => route.matched.some((r) => r.meta.admin))
 
 onMounted(() => {
+  // Already loaded at boot (main.ts); this covers a theme that was slow or failed there.
+  useThemeStore()
+    .ensureLoaded()
+    .catch(() => {})
   // Without categories the header only offers "Todo"; the store still works, so don't block on it.
   catalog.loadTaxonomy().catch(() => {})
   void catalog.loadProducts()
