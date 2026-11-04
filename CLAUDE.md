@@ -68,6 +68,21 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
   so the proxy passes the browser's host through (`changeOrigin: false` in `vite.config.ts`;
   Vite's string shorthand would set it to `true` and rewrite the host). `localhost:5173` and
   `127.0.0.1:5173` belong to no tenant and get a 404 from `/api`.
+- The platform admin's tool (Milestone 2, plan §1, §8) is served by the same app on the **platform host**
+  (`VITE_PLATFORM_HOST`, `platform.localhost` in `.env.development`; unset means a build without it).
+  `main.ts` loads `src/platform/` with a dynamic import only on that host, so a store's own site never
+  requests it (checked in the build: the entry chunk lists it only as a preload target). It has its own
+  app and router: `/plataforma/ingresar` signs in against `/api/platform/auth/*` (`stores/platform.ts`,
+  `api/platform.ts`; the access token lives in memory, the refresh cookie is httpOnly), then the storefront
+  screens (`HomeView`, `ProductView`) render a **read-only preview** of the store picked in the tenant bar
+  (the mock's switcher, `PlatformTenantBar.vue`; the pick is remembered per tab). `api/http.ts` sends
+  `X-Preview-Tenant: <slug>` on every call except the platform's own. The shared components hide every
+  shopper control when `isPlatformHost()`: no cart, account, favorites or add-to-cart, and the shopper
+  `auth` store does not register its HTTP hooks there (it would take over the platform admin's token).
+  There is no cart, checkout, account or admin route on the platform host. Until per-store theming
+  (Milestone 3) the header and footer still show Regate's branding around any store's products. Tests:
+  `platform.spec.ts`, with the platform side in `fakeApi.ts` (as strict as the Api: a preview without the
+  admin's token is a 401).
 - `design/` is excluded from oxlint and ESLint (`.oxlintrc.json`, `eslint.config.ts`). It's
   reference material, not app code.
 

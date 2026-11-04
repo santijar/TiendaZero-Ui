@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import logo from '@/assets/regate-logo.png'
+import { isPlatformHost } from '@/lib/platform'
 import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
 import { useCatalogStore } from '@/stores/catalog'
@@ -15,6 +16,9 @@ const cart = useCartStore()
 const auth = useAuthStore()
 
 const onHome = computed(() => route.name === 'home')
+
+// A platform admin's preview shows the store as shoppers see it and lets them do nothing: no account, no cart.
+const preview = isPlatformHost()
 
 function goHome() {
   catalog.setFilter({})
@@ -63,6 +67,7 @@ function onSearch(event: Event) {
         />
       </div>
       <RouterLink
+        v-if="!preview"
         :to="{ name: auth.isSignedIn ? 'account' : 'login' }"
         class="btn btn-secondary btn-icon account"
         :aria-label="auth.isSignedIn ? 'Mi cuenta' : 'Ingresar'"
@@ -70,7 +75,13 @@ function onSearch(event: Event) {
       >
         <AppIcon name="user" :size="17" />
       </RouterLink>
-      <button type="button" class="btn btn-secondary cart" aria-label="Carrito" @click="cart.open">
+      <button
+        v-if="!preview"
+        type="button"
+        class="btn btn-secondary cart"
+        aria-label="Carrito"
+        @click="cart.open"
+      >
         <AppIcon name="bag" :size="17" />
         <span>{{ cart.count }}</span>
       </button>
