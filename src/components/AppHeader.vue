@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, type CSSProperties } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import { logoStyle } from '@/lib/logoStyle'
 import { isPlatformHost } from '@/lib/platform'
 import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
@@ -16,24 +17,10 @@ const cart = useCartStore()
 const auth = useAuthStore()
 const theme = computed(() => useThemeStore().theme)
 const storeName = computed(() => theme.value?.storeName ?? '')
-type MixBlendMode = NonNullable<CSSProperties['mixBlendMode']>
 
-// The store's logo, drawn as a background so its size, margin, filter and blend come straight from the theme.
-// Without an explicit blend, a dark store's logo uses Nocturne's `lighten` (its dark artwork background drops
-// out against the page, like the photos); a light store's is drawn as it is.
-const logoStyle = computed<CSSProperties | null>(() => {
+const logoCss = computed(() => {
   const t = theme.value
-  if (!t?.logo) return null
-  const { logo } = t
-  return {
-    width: logo.width ?? '44px',
-    height: logo.height ?? '44px',
-    margin: logo.margin ?? '0',
-    backgroundImage: `url(${JSON.stringify(logo.url)})`,
-    filter: logo.filter ?? 'none',
-    // Free text from the theme; the browser ignores a value it doesn't know.
-    mixBlendMode: (logo.blendMode ?? (t.mode === 'Dark' ? 'lighten' : 'normal')) as MixBlendMode,
-  }
+  return t?.logo ? logoStyle(t.logo, t.mode) : null
 })
 
 const onHome = computed(() => route.name === 'home')
@@ -62,7 +49,7 @@ function onSearch(event: Event) {
   <header class="header">
     <div class="bar">
       <button type="button" class="brand" :aria-label="storeName" @click="goHome">
-        <span v-if="logoStyle" class="logo" role="img" :aria-label="storeName" :style="logoStyle" />
+        <span v-if="logoCss" class="logo" role="img" :aria-label="storeName" :style="logoCss" />
         <span v-else-if="!theme?.wordmark" class="monogram">{{ theme?.monogram }}</span>
         <span v-if="theme?.wordmark" class="wordmark">{{ theme.wordmark }}</span>
       </button>

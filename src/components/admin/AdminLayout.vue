@@ -3,6 +3,7 @@ import { RouterLink, RouterView } from 'vue-router'
 
 import '@/assets/admin.css'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
 
 const auth = useAuthStore()
 
@@ -10,15 +11,16 @@ const LINKS = [
   { to: { name: 'admin-orders' }, label: 'Pedidos' },
   { to: { name: 'admin-products' }, label: 'Productos' },
   { to: { name: 'admin-taxonomy' }, label: 'Categorías y colecciones' },
+  { to: { name: 'admin-theme' }, label: 'Marca' },
 ]
+const theme = useThemeStore()
 </script>
 
 <template>
   <div class="admin-shell">
     <aside class="admin-nav">
       <RouterLink :to="{ name: 'admin-orders' }" class="admin-brand">
-        <img src="@/assets/regate-logo.png" alt="Regate" />
-        <span>Admin</span>
+        <span>{{ theme.theme?.storeName }} · Admin</span>
       </RouterLink>
       <nav>
         <RouterLink v-for="l in LINKS" :key="l.label" :to="l.to" class="admin-link">
@@ -69,10 +71,6 @@ const LINKS = [
   color: var(--color-neutral-400);
   font-size: 13px;
   text-decoration: none;
-}
-
-.admin-brand img {
-  height: 22px;
 }
 
 nav {

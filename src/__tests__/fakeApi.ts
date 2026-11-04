@@ -2,7 +2,7 @@ import { vi } from 'vitest'
 
 import type { Cart, CartItem } from '../api/cart'
 import type { Category, ProductDetail, ProductSummary } from '../api/catalog'
-import type { AdminProduct, SaveProduct } from '../api/admin'
+import type { AdminProduct, AdminTheme, SaveProduct, SaveTheme, ThemeColors } from '../api/admin'
 import type { Order } from '../api/orders'
 import type { Theme } from '../api/theme'
 
@@ -398,6 +398,7 @@ function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
 
   return {
     state,
+    theme: createThemeAdmin(),
     handle(method: string, path: string, body: Record<string, unknown>) {
       if (path === '/api/admin/categories') {
         return json([
@@ -488,6 +489,113 @@ function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
         order.trackingInfo = (body.trackingInfo as string | null) ?? order.trackingInfo
       }
       return json(adminOrder(order))
+    },
+  }
+}
+
+// The branding editor's side of the Api (/api/admin/theme*): the stored theme, what was saved, and the same
+// validation messages and file checks the real one answers with (the Api's own tests cover the rules).
+function createThemeAdmin() {
+  const state = {
+    theme: {
+      mode: 'Dark',
+      accentHue: 289,
+      hasHandPickedAccent: true,
+      storeName: 'Regate',
+      footerLegalName: 'Regate Indumentaria',
+      logoUrl: '/media/brand/regate-logo.png',
+      logoWidth: '44px',
+      logoHeight: '44px',
+      logoMargin: '-4px -6px',
+      logoFilter: null,
+      logoBlendMode: null,
+      wordmark: 'REGATE',
+      monogram: 'RG',
+      faviconUrl: null,
+      socialLinks: [
+        { label: '@regate.indumentaria', url: 'https://www.instagram.com/regate.indumentaria/' },
+      ],
+      emailAccentHex: '#9184d9',
+      emailLogoUrl: null,
+      preview: REGATE_THEME,
+    } as AdminTheme,
+    saves: [] as SaveTheme[],
+    previews: [] as { accentHue: number; useHandPickedAccent: boolean }[],
+    uploads: [] as string[],
+  }
+
+  // Dark and light variables for a hue: just the ones the editor measures. Hue 0 is the awkward one, whose
+  // dark accent is nearly the ground's color.
+  const colors = (hue: number): ThemeColors => ({
+    dark: {
+      '--color-bg': '#161826',
+      '--color-surface': '#232532',
+      '--color-accent': hue === 0 ? '#222222' : '#a296f1',
+      '--color-accent-200': '#e7e5fe',
+      '--color-accent-900': '#2b2741',
+    },
+    light: {
+      '--color-bg': '#f6f7fa',
+      '--color-surface': '#ffffff',
+      '--color-accent': '#7363c0',
+      '--color-accent-200': '#2b2741',
+      '--color-accent-900': '#f5f4ff',
+    },
+  })
+
+  return {
+    state,
+    handle(method: string, path: string, body: Record<string, unknown>, form: FormData | null) {
+      const theme = state.theme
+      if (path === '/api/admin/theme' && method === 'GET') return json(theme)
+      if (path === '/api/admin/theme' && method === 'PUT') {
+        const save = body as unknown as SaveTheme
+        if (!save.storeName?.trim()) {
+          return json(
+            { errors: { storeName: ['El nombre de la tienda tiene entre 1 y 80 caracteres.'] } },
+            400,
+          )
+        }
+        state.saves.push(save)
+        const { useHandPickedAccent, ...fields } = save
+        Object.assign(theme, fields, {
+          hasHandPickedAccent: theme.hasHandPickedAccent && useHandPickedAccent,
+        })
+        theme.preview = { ...theme.preview, mode: theme.mode, storeName: theme.storeName }
+        return json(theme)
+      }
+      if (path === '/api/admin/theme/preview' && method === 'POST') {
+        const request = body as unknown as { accentHue: number; useHandPickedAccent: boolean }
+        state.previews.push(request)
+        return json(colors(request.accentHue))
+      }
+      const asset = /^\/api\/admin\/theme\/(logo|favicon)$/.exec(path)?.[1] as
+        'logo' | 'favicon' | undefined
+      if (asset && method === 'POST') {
+        const file = form?.get('file')
+        const name = file instanceof File ? file.name : ''
+        if (!/\.(png|jpe?g|webp|ico)$/i.test(name)) {
+          return json({ errors: { file: ['Subí una imagen JPG, PNG o WebP.'] } }, 400)
+        }
+        state.uploads.push(`${asset}:${name}`)
+        if (asset === 'logo') theme.logoUrl = `/media/uploads/01/${name}`
+        else theme.faviconUrl = `/media/uploads/01/${name}`
+        return json(theme)
+      }
+      if (asset && method === 'DELETE') {
+        if (asset === 'logo') {
+          Object.assign(theme, {
+            logoUrl: null,
+            logoWidth: null,
+            logoHeight: null,
+            logoMargin: null,
+            logoFilter: null,
+            logoBlendMode: null,
+          })
+        } else theme.faviconUrl = null
+        return json(theme)
+      }
+      return json({ status: 404 }, 404)
     },
   }
 }
@@ -593,7 +701,7 @@ export function stubApi() {
     const url = new URL(String(input), 'http://localhost')
     const method = init?.method ?? 'GET'
     const headers = new Headers(init?.headers)
-    const body = init?.body ? JSON.parse(String(init.body)) : {}
+    const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
     if (url.pathname.startsWith('/api/platform/auth/')) {
       return platformServer.handleAuth(method, url.pathname, body)
     }
@@ -631,6 +739,10 @@ export function stubApi() {
       if (!email) return json({}, 401)
       const roles = api.auth.users.get(email)?.roles ?? []
       if (!roles.includes('TenantAdmin')) return json({}, 403)
+      if (url.pathname.startsWith('/api/admin/theme')) {
+        const form = init?.body instanceof FormData ? init.body : null
+        return adminServer.theme.handle(method, url.pathname, body, form)
+      }
       return adminServer.handle(method, url.pathname, body)
     }
     if (url.pathname.startsWith('/api/orders') || url.pathname === '/api/account/orders') {

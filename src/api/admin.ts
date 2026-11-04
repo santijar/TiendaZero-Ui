@@ -2,6 +2,7 @@
 // Requires a signed-in TenantAdmin. Validation messages come back in Spanish, ready to show.
 import { request } from './http'
 import type { Order, OrderStatus, PaymentMethod } from './orders'
+import type { Theme } from './theme'
 
 export type Fulfillment = Order['fulfillment']
 
@@ -187,3 +188,72 @@ export const updateFulfillment = (number: string, status: Fulfillment, trackingI
   })
 export const resolveReview = (number: string, note: string) =>
   request<AdminOrder>('POST', `${orderPath(number)}/resolve-review`, { body: { note } })
+
+// ---- branding ----
+
+export interface SocialLinkInput {
+  label: string
+  url: string
+}
+
+// What the branding editor loads (AdminThemeEndpoints in the Api). `preview` is what the storefront will
+// serve after saving. Logo and favicon are only ever set by uploading a file.
+export interface AdminTheme {
+  mode: 'Dark' | 'Light'
+  accentHue: number
+  hasHandPickedAccent: boolean
+  storeName: string
+  footerLegalName: string | null
+  logoUrl: string | null
+  logoWidth: string | null
+  logoHeight: string | null
+  logoMargin: string | null
+  logoFilter: string | null
+  logoBlendMode: string | null
+  wordmark: string | null
+  monogram: string | null
+  faviconUrl: string | null
+  socialLinks: SocialLinkInput[]
+  emailAccentHex: string
+  emailLogoUrl: string | null
+  preview: Theme
+}
+
+export type SaveTheme = Omit<
+  AdminTheme,
+  'hasHandPickedAccent' | 'logoUrl' | 'faviconUrl' | 'preview' | 'emailAccentHex'
+> & {
+  useHandPickedAccent: boolean
+  // Blank means "use the resolved accent" (the Api answers it back filled in).
+  emailAccentHex: string | null
+}
+
+// Every CSS variable of the theme, once per mode, for one accent (not saved).
+export interface ThemeColors {
+  dark: Record<string, string>
+  light: Record<string, string>
+}
+
+export type ThemeAsset = 'logo' | 'favicon'
+
+export const getAdminTheme = () => request<AdminTheme>('GET', '/api/admin/theme')
+export const saveAdminTheme = (body: SaveTheme) =>
+  request<AdminTheme>('PUT', '/api/admin/theme', { body })
+export const previewThemeColors = (
+  accentHue: number,
+  useHandPickedAccent: boolean,
+  signal?: AbortSignal,
+) =>
+  request<ThemeColors>('POST', '/api/admin/theme/preview', {
+    body: { accentHue, useHandPickedAccent },
+    signal,
+  })
+
+export function uploadThemeAsset(asset: ThemeAsset, file: File): Promise<AdminTheme> {
+  const form = new FormData()
+  form.append('file', file)
+  return request('POST', `/api/admin/theme/${asset}`, { form })
+}
+
+export const removeThemeAsset = (asset: ThemeAsset) =>
+  request<AdminTheme>('DELETE', `/api/admin/theme/${asset}`)
