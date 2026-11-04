@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 
 import type { ProductSummary } from '@/api/catalog'
 import { formatPrice } from '@/lib/commerce'
+import { isPlatformHost } from '@/lib/platform'
 import { useCartStore } from '@/stores/cart'
 import { useFavoritesStore } from '@/stores/favorites'
 import AppIcon from './AppIcon.vue'
@@ -14,6 +15,8 @@ const props = defineProps<{ product: ProductSummary }>()
 const router = useRouter()
 const cart = useCartStore()
 const favorites = useFavoritesStore()
+// In a platform admin's preview there is nothing to buy or save.
+const preview = isPlatformHost()
 
 const singleSize = computed(() =>
   props.product.sizes.length === 1 ? props.product.sizes[0] : undefined,
@@ -36,6 +39,7 @@ function quickAdd() {
       <ProductImage :src="product.imageUrl" :alt="product.name" placeholder="Foto de producto" />
       <span v-if="product.badge" class="tag tag-accent badge">{{ product.badge }}</span>
       <button
+        v-if="!preview"
         type="button"
         class="fav"
         :class="{ on: isFavorite }"
@@ -45,7 +49,7 @@ function quickAdd() {
       >
         <AppIcon name="heart" :filled="isFavorite" />
       </button>
-      <button type="button" class="btn btn-secondary quick" @click.stop="quickAdd">
+      <button v-if="!preview" type="button" class="btn btn-secondary quick" @click.stop="quickAdd">
         {{ singleSize ? 'Agregar al carrito' : 'Elegir talle' }}
       </button>
     </div>

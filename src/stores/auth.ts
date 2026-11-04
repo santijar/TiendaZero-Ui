@@ -11,6 +11,7 @@ import {
   type User,
 } from '@/api/auth'
 import { configureAuth } from '@/api/http'
+import { isPlatformHost } from '@/lib/platform'
 import { useCartStore } from './cart'
 import { useFavoritesStore } from './favorites'
 
@@ -51,7 +52,9 @@ export const useAuthStore = defineStore('auth', () => {
     return refreshing
   }
 
-  configureAuth({ accessToken: () => accessToken, refresh: renew })
+  // On the platform host the HTTP client belongs to the platform admin's session (stores/platform.ts); a shopper
+  // store created by a shared storefront component must not take it over.
+  if (!isPlatformHost()) configureAuth({ accessToken: () => accessToken, refresh: renew })
 
   // Resolves once the page-load session restore has finished, signed in or not.
   function ready(): Promise<void> {

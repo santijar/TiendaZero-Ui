@@ -43,15 +43,26 @@ export function configureAuth(hooks: AuthHooks | null) {
   auth = hooks
 }
 
+// On the platform host only: the store a platform admin is previewing. The Api answers the public catalog as
+// that store when this header names it (see PreviewTenantMiddleware). Never sent to the platform's own endpoints.
+const PREVIEW_HEADER = 'X-Preview-Tenant'
+let previewTenant: (() => string | null) | null = null
+
+export function configurePreview(slug: (() => string | null) | null) {
+  previewTenant = slug
+}
+
 async function send(method: string, path: string, options: RequestOptions): Promise<Response> {
   const { body, form, headers, signal } = options
   const token = auth?.accessToken()
+  const preview = path.startsWith('/api/platform/') ? null : previewTenant?.()
   return fetch(path, {
     method,
     headers: {
       Accept: 'application/json',
       ...(body === undefined || form ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(preview ? { [PREVIEW_HEADER]: preview } : {}),
       ...headers,
     },
     body: form ?? (body === undefined ? undefined : JSON.stringify(body)),
@@ -67,7 +78,13 @@ export async function request<T>(
   let response = await send(method, path, options)
   // The auth endpoints report their own 401s (wrong password, expired session); everything else
   // gets one transparent retry after renewing the access token.
-  if (response.status === 401 && auth && !path.startsWith('/api/auth/') && (await auth.refresh())) {
+  if (
+    response.status === 401 &&
+    auth &&
+    !path.startsWith('/api/auth/') &&
+    !path.startsWith('/api/platform/auth/') &&
+    (await auth.refresh())
+  ) {
     response = await send(method, path, options)
   }
   if (!response.ok) {

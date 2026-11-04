@@ -6,6 +6,7 @@ import { ApiError } from '@/api/http'
 import AppIcon from '@/components/AppIcon.vue'
 import ProductImage from '@/components/ProductImage.vue'
 import { formatPrice, installmentsLabel } from '@/lib/commerce'
+import { isPlatformHost } from '@/lib/platform'
 import { useCartStore } from '@/stores/cart'
 import { useFavoritesStore } from '@/stores/favorites'
 import NotFoundView from './NotFoundView.vue'
@@ -14,6 +15,8 @@ const props = defineProps<{ slug: string }>()
 
 const cart = useCartStore()
 const favorites = useFavoritesStore()
+// A platform admin's preview shows the product but offers no way to buy or save it.
+const preview = isPlatformHost()
 
 const product = ref<ProductDetail | null>(null)
 const status = ref<'loading' | 'ready' | 'not-found' | 'error'>('loading')
@@ -130,7 +133,10 @@ function addToCart() {
           <span v-if="sizeError" class="size-error">Elegí un talle para continuar.</span>
         </div>
 
-        <div class="actions">
+        <p v-if="preview" class="preview-note">
+          Vista previa de solo lectura: no se puede comprar.
+        </p>
+        <div v-else class="actions">
           <button type="button" class="btn btn-primary add" @click="addToCart">
             <AppIcon name="bag" :size="18" />Agregar al carrito
           </button>
@@ -327,6 +333,12 @@ function addToCart() {
 .actions {
   display: flex;
   gap: 8px;
+}
+
+.preview-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-neutral-400);
 }
 
 .add {

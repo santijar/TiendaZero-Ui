@@ -491,6 +491,91 @@ function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
   }
 }
 
+export const PLATFORM_ADMIN = { email: 'root@plataforma.test', password: 'clave-segura-26' }
+
+export const PLATFORM_TENANTS = [
+  {
+    id: '01',
+    slug: 'regate',
+    name: 'Regate',
+    status: 'Active',
+    orderNumberPrefix: 'RG',
+    primaryDomain: 'regate.localhost',
+  },
+  {
+    id: '02',
+    slug: 'indians',
+    name: 'Indians',
+    status: 'Active',
+    orderNumberPrefix: 'IND',
+    primaryDomain: 'indians.localhost',
+  },
+]
+
+export const INDIANS_CATEGORIES: Category[] = [{ slug: 'beisbol', name: 'Béisbol' }]
+
+export const INDIANS_PRODUCTS: ProductSummary[] = [
+  {
+    slug: 'jersey-ctg',
+    name: 'Camiseta Béisbol CTG',
+    categorySlug: 'beisbol',
+    categoryName: 'Béisbol',
+    price: 54900,
+    color: 'Blanco y celeste',
+    badge: null,
+    imageUrl: null,
+    sizes: ['S', 'M'],
+  },
+]
+
+// The platform side of the Api: a platform admin's session (cookie-backed, like the real one), the store list, and
+// the read-only preview of a store's public catalog. It is as strict as the real thing, so a Ui that forgets the
+// token or the header fails here instead of passing.
+function createPlatformServer() {
+  let cookie = false // the httpOnly refresh cookie
+  let counter = 0
+  let validToken: string | null = null
+
+  function session() {
+    validToken = `platform-token-${++counter}`
+    return {
+      accessToken: validToken,
+      expiresAt: new Date(Date.now() + 900_000).toISOString(),
+      user: {
+        id: 'platform-1',
+        email: PLATFORM_ADMIN.email,
+        name: 'Root',
+        roles: ['PlatformAdmin'],
+      },
+    }
+  }
+
+  return {
+    // Makes the current access token stop working, as when it expires.
+    expireToken() {
+      validToken = null
+    },
+    isAuthorized: (authorization: string | null) =>
+      !!validToken && authorization === `Bearer ${validToken}`,
+    handleAuth(method: string, path: string, body: { email?: string; password?: string }) {
+      if (path.endsWith('/login')) {
+        if (body.email !== PLATFORM_ADMIN.email || body.password !== PLATFORM_ADMIN.password) {
+          return json({ status: 401, detail: 'El email o la contraseña no son correctos.' }, 401)
+        }
+        cookie = true
+        return json(session())
+      }
+      if (path.endsWith('/refresh')) return cookie ? json(session()) : json({ status: 401 }, 401)
+      if (path.endsWith('/logout') && method === 'POST') {
+        cookie = false
+        validToken = null
+        return new Response(null, { status: 204 })
+      }
+      return json({ status: 404 }, 404)
+    },
+  }
+}
+
 export type FakeApi = ReturnType<typeof stubApi>
 
 // Stubs `fetch` with a tiny in-memory version of the Api (catalog, cart, auth, account). Returns
@@ -500,11 +585,37 @@ export function stubApi() {
   const authServer = createAuthServer(cartServer)
   const orderServer = createOrderServer(cartServer)
   const adminServer = createAdminServer(orderServer)
+  const platformServer = createPlatformServer()
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
     const url = new URL(String(input), 'http://localhost')
     const method = init?.method ?? 'GET'
     const headers = new Headers(init?.headers)
     const body = init?.body ? JSON.parse(String(init.body)) : {}
+    if (url.pathname.startsWith('/api/platform/auth/')) {
+      return platformServer.handleAuth(method, url.pathname, body)
+    }
+    if (url.pathname === '/api/platform/tenants') {
+      return platformServer.isAuthorized(headers.get('Authorization'))
+        ? json(PLATFORM_TENANTS)
+        : json({}, 401)
+    }
+    const previewing = headers.get('X-Preview-Tenant')
+    if (previewing) {
+      // A preview needs the platform admin's token, is read-only and reaches only the public catalog.
+      if (!platformServer.isAuthorized(headers.get('Authorization'))) return json({}, 401)
+      if (method !== 'GET') return json({}, 403)
+      const store = PLATFORM_TENANTS.find((t) => t.slug === previewing)
+      if (!store) return json({ status: 404 }, 404)
+      const indians = store.slug === 'indians'
+      if (url.pathname === '/api/categories') return json(indians ? INDIANS_CATEGORIES : CATEGORIES)
+      if (url.pathname === '/api/collections') return json([])
+      if (url.pathname === '/api/products') {
+        const items = indians ? INDIANS_PRODUCTS : PRODUCTS
+        return json({ items, total: items.length, page: 1, pageSize: 48 })
+      }
+      if (url.pathname === '/api/products/cam-titular' && !indians) return json(TITULAR_DETAIL)
+      return json({ status: 404 }, 404)
+    }
     if (url.pathname.startsWith('/api/auth/')) {
       return authServer.handle(method, url.pathname, body, headers.get('X-Cart-Token'))
     }
@@ -547,6 +658,7 @@ export function stubApi() {
     auth: authServer,
     orders: orderServer,
     admin: adminServer,
+    platform: platformServer,
   }
   return api
 }
