@@ -262,7 +262,7 @@ plan's §5), with the role model now explicitly three-tiered:
 
 | Role | Scope | Notes |
 |---|---|---|
-| `PlatformAdmin` | None (`User.TenantId = null`) | Manages `Tenant`/`TenantDomain`/`TenantTheme`/`TenantPaymentAccount` rows across all tenants. No public signup; seeded/promoted manually, same as the original plan's `Admin` role was |
+| `PlatformAdmin` | None (`User.TenantId = null`) | Manages `Tenant`/`TenantDomain`/`TenantTheme`/`TenantPaymentAccount` rows across all tenants. No public signup; seeded/promoted manually, same as the original plan's `Admin` role was. Signs in on the platform host at `/api/platform/auth/*` (separate from a store's `/api/auth`), and their token carries no `tid`, so it is only valid there |
 | `TenantAdmin` | Exactly one tenant | Replaces the original plan's single `Admin` role for everything under `/api/admin/*` — scoped to their own tenant's products/categories/collections/orders only, enforced by the same global query filter as every other tenant-owned read |
 | `Customer` | Exactly one tenant | Default on register; a `/api/auth/register` call is itself tenant-scoped (resolved from `Host`, same as everything else) |
 
