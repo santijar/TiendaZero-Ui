@@ -172,8 +172,18 @@ the mock's light variant:
 --shadow-lg: 0 0 0 1px rgba(27,29,38,0.08), 0 16px 40px rgba(27,29,38,0.18);
 ```
 The mock only worked out neutral steps 300/400/500/800/900 for light mode (what the storefront
-actually uses) — 100/200/600/700 need filling in during Milestone 3 on the same OKLCH lightness
-scale as the dark ramp, not invented ad hoc.
+actually uses). Milestone 3 filled in 100/200/600/700 on the same OKLCH lightness scale as the dark
+ramp: the mock's own steps land on it mirrored (light 300/400/800 are dark 800/700/200), so light N
+takes dark (1100 − N) — 200 = `#292b31`, 600 = `#9397ab`, 700 = `#b2b6ca` — and 100, which would be
+past the dark ramp's end, continues the scale one step (`#14161d`, L 0.20). They live in
+`ThemeRamp.Light` (Api), with tests that keep the ramp monotonic.
+
+The accent formula table below defines only steps 200/300/400/500/700/900, as the mock does. The
+mock's light theme points the rest at neighbors (100 = 200, 600 = 400, 800 = 900); the dark mock
+left them to Nocturne's Regate-blurple defaults, which would leak Regate's color into every other
+dark store, so `ThemeRamp` applies the same mapping to both modes. `AccentHexOverride` is stored as
+JSON (a base color plus a hex per step, and optionally a separate accent-2 ramp), not a single hex,
+because Nocturne's hand-tuned ramp is ten values and its accent-2 differs from its accent.
 
 ### Tenant-brandable — `TenantTheme` fields
 
