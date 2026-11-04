@@ -6,6 +6,10 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import { isPlatformHost } from './lib/platform'
 import router from './router'
+import { useThemeStore } from './stores/theme'
+
+// How long the first paint waits for the store's theme before showing the page in Nocturne's defaults.
+const THEME_WAIT_MS = 2000
 
 if (isPlatformHost()) {
   // The platform admin's tool (docs/plan.md §1) has its own app, loaded only here. A store's own site never
@@ -14,9 +18,19 @@ if (isPlatformHost()) {
   mountPlatformApp('#app')
 } else {
   const app = createApp(App)
+  const pinia = createPinia()
 
-  app.use(createPinia())
+  app.use(pinia)
   app.use(router)
+
+  // Apply the store's colors before the first paint, so it never flashes in another store's look. A slow or
+  // failed theme must not keep the store from opening: App retries it, and the defaults are readable meanwhile.
+  await Promise.race([
+    useThemeStore(pinia)
+      .ensureLoaded()
+      .catch(() => {}),
+    new Promise((resolve) => setTimeout(resolve, THEME_WAIT_MS)),
+  ])
 
   app.mount('#app')
 }

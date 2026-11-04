@@ -4,6 +4,7 @@ import type { Cart, CartItem } from '../api/cart'
 import type { Category, ProductDetail, ProductSummary } from '../api/catalog'
 import type { AdminProduct, SaveProduct } from '../api/admin'
 import type { Order } from '../api/orders'
+import type { Theme } from '../api/theme'
 
 export const CATEGORIES: Category[] = [
   { slug: 'camisetas', name: 'Camisetas' },
@@ -586,6 +587,8 @@ export function stubApi() {
   const orderServer = createOrderServer(cartServer)
   const adminServer = createAdminServer(orderServer)
   const platformServer = createPlatformServer()
+  // The theme of the store the fake "host" belongs to: Regate unless a test swaps it.
+  const theme: { current: Theme } = { current: REGATE_THEME }
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
     const url = new URL(String(input), 'http://localhost')
     const method = init?.method ?? 'GET'
@@ -607,6 +610,7 @@ export function stubApi() {
       const store = PLATFORM_TENANTS.find((t) => t.slug === previewing)
       if (!store) return json({ status: 404 }, 404)
       const indians = store.slug === 'indians'
+      if (url.pathname === '/api/theme') return json(indians ? INDIANS_THEME : REGATE_THEME)
       if (url.pathname === '/api/categories') return json(indians ? INDIANS_CATEGORIES : CATEGORIES)
       if (url.pathname === '/api/collections') return json([])
       if (url.pathname === '/api/products') {
@@ -641,6 +645,7 @@ export function stubApi() {
       if (email && !cartServer.carts.has(key!)) cartServer.carts.set(key!, [])
       return cartServer.handle(method, url.pathname, key, body)
     }
+    if (url.pathname === '/api/theme') return json(theme.current)
     if (url.pathname === '/api/categories') return json(CATEGORIES)
     if (url.pathname === '/api/collections') return json([])
     if (url.pathname === '/api/products') {
@@ -659,6 +664,48 @@ export function stubApi() {
     orders: orderServer,
     admin: adminServer,
     platform: platformServer,
+    theme,
   }
   return api
+}
+
+// What GET /api/theme answers, trimmed to the variables the tests look at (the Api's ThemeTests cover the full set).
+export const REGATE_THEME: Theme = {
+  mode: 'Dark',
+  storeName: 'Regate',
+  footerLegalName: 'Regate Indumentaria',
+  cssVariables: { '--color-bg': '#161826', '--color-accent': '#9184d9' },
+  logo: {
+    url: '/media/brand/regate-logo.png',
+    width: '44px',
+    height: '44px',
+    margin: '-4px -6px',
+    filter: null,
+    blendMode: null,
+  },
+  wordmark: 'REGATE',
+  monogram: 'RG',
+  faviconUrl: null,
+  socialLinks: [
+    { label: '@regate.indumentaria', url: 'https://www.instagram.com/regate.indumentaria/' },
+  ],
+}
+
+export const INDIANS_THEME: Theme = {
+  mode: 'Light',
+  storeName: 'Indians',
+  footerLegalName: 'Indians Indumentaria',
+  cssVariables: { '--color-bg': '#f6f7fa', '--color-accent': '#2a73b8' },
+  logo: {
+    url: '/media/brand/indians-logo.png',
+    width: '116px',
+    height: '29px',
+    margin: '0',
+    filter: null,
+    blendMode: null,
+  },
+  wordmark: null,
+  monogram: 'IN',
+  faviconUrl: '/media/brand/indians-favicon.png',
+  socialLinks: [{ label: '@indians', url: 'https://www.instagram.com/' }],
 }

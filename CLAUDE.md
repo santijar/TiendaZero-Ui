@@ -79,10 +79,22 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
   `X-Preview-Tenant: <slug>` on every call except the platform's own. The shared components hide every
   shopper control when `isPlatformHost()`: no cart, account, favorites or add-to-cart, and the shopper
   `auth` store does not register its HTTP hooks there (it would take over the platform admin's token).
-  There is no cart, checkout, account or admin route on the platform host. Until per-store theming
-  (Milestone 3) the header and footer still show Regate's branding around any store's products. Tests:
+  There is no cart, checkout, account or admin route on the platform host. The preview wears the picked store's
+  own branding (see Theming below); signed out, it has none. Tests:
   `platform.spec.ts`, with the platform side in `fakeApi.ts` (as strict as the Api: a preview without the
   admin's token is a 401).
+- Theming (Milestone 3, slice 2, plan §3). `GET /api/theme` (`src/api/theme.ts`) returns a store's branding already
+  resolved: `cssVariables` (plain values), logo, wordmark, monogram, favicon, footer name and social links. The
+  Ui does no color math. `stores/theme.ts` loads it; `lib/applyTheme.ts` sets the variables on `<html>` (they
+  override Nocturne's defaults in `nocturne.css`, which stays verbatim), `data-theme-mode`, `color-scheme`, the tab
+  title and the favicon. `main.ts` awaits it (max 2 s) before mounting, so a store never flashes in another's look;
+  `App.vue` retries if that failed, and a failed theme leaves Nocturne's defaults. The platform preview calls
+  `load()` whenever another store is picked and `reset()` when signed out. `AppHeader` draws the logo as a
+  background (size, margin, filter and blend from the theme; with no blend set, a Dark store's logo uses
+  `lighten`, a Light store's `normal`), else the wordmark, with the monogram badge when there is neither;
+  `AppFooter` shows `© year footerLegalName` and the first social link. Still Regate-specific, on purpose (later
+  work): the home promo slides (`src/catalog/promos.ts`), the checkout's pickup text and the admin's sidebar logo.
+  Tests: `theme.spec.ts`; `fakeApi.ts` has `REGATE_THEME`/`INDIANS_THEME` and `api.theme.current`.
 - `design/` is excluded from oxlint and ESLint (`.oxlintrc.json`, `eslint.config.ts`). It's
   reference material, not app code.
 

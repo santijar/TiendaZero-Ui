@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, type CSSProperties } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import logo from '@/assets/regate-logo.png'
 import { isPlatformHost } from '@/lib/platform'
 import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
 import { useCatalogStore } from '@/stores/catalog'
+import { useThemeStore } from '@/stores/theme'
 import AppIcon from './AppIcon.vue'
 
 const route = useRoute()
@@ -14,6 +14,27 @@ const router = useRouter()
 const catalog = useCatalogStore()
 const cart = useCartStore()
 const auth = useAuthStore()
+const theme = computed(() => useThemeStore().theme)
+const storeName = computed(() => theme.value?.storeName ?? '')
+type MixBlendMode = NonNullable<CSSProperties['mixBlendMode']>
+
+// The store's logo, drawn as a background so its size, margin, filter and blend come straight from the theme.
+// Without an explicit blend, a dark store's logo uses Nocturne's `lighten` (its dark artwork background drops
+// out against the page, like the photos); a light store's is drawn as it is.
+const logoStyle = computed<CSSProperties | null>(() => {
+  const t = theme.value
+  if (!t?.logo) return null
+  const { logo } = t
+  return {
+    width: logo.width ?? '44px',
+    height: logo.height ?? '44px',
+    margin: logo.margin ?? '0',
+    backgroundImage: `url(${JSON.stringify(logo.url)})`,
+    filter: logo.filter ?? 'none',
+    // Free text from the theme; the browser ignores a value it doesn't know.
+    mixBlendMode: (logo.blendMode ?? (t.mode === 'Dark' ? 'lighten' : 'normal')) as MixBlendMode,
+  }
+})
 
 const onHome = computed(() => route.name === 'home')
 
@@ -40,9 +61,10 @@ function onSearch(event: Event) {
 <template>
   <header class="header">
     <div class="bar">
-      <button type="button" class="brand" @click="goHome">
-        <img class="lighten" :src="logo" alt="Regate" width="44" height="44" />
-        <span>REGATE</span>
+      <button type="button" class="brand" :aria-label="storeName" @click="goHome">
+        <span v-if="logoStyle" class="logo" role="img" :aria-label="storeName" :style="logoStyle" />
+        <span v-else-if="!theme?.wordmark" class="monogram">{{ theme?.monogram }}</span>
+        <span v-if="theme?.wordmark" class="wordmark">{{ theme.wordmark }}</span>
       </button>
       <nav class="nav-cats" aria-label="Categorías">
         <button
@@ -119,16 +141,32 @@ function onSearch(event: Event) {
   font: inherit;
 }
 
-.brand img {
-  width: 44px;
-  height: 44px;
-  margin: -4px -6px;
+.logo {
+  flex: none;
+  background: center / contain no-repeat;
 }
 
-.brand span {
+.wordmark {
   font-size: 17px;
   font-weight: 500;
   letter-spacing: 0.14em;
+  white-space: nowrap;
+}
+
+/* The fallback badge when a store has neither a logo nor a wordmark. */
+.monogram {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  font-size: 11px;
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+  display: grid;
+  place-items: center;
+  font-weight: 500;
+  letter-spacing: 0.04em;
 }
 
 .nav-cats {
