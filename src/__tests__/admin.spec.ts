@@ -199,4 +199,25 @@ describe('admin', () => {
     expect(router.currentRoute.value.fullPath).toBe('/admin/productos/2')
     expect(wrapper.text()).toContain('Subir fotos')
   })
+
+  it('marks the size row whose SKU is missing, and sends nothing', async () => {
+    signInAs('admin@mail.com', ['TenantAdmin'])
+    const wrapper = await mountAt('/admin/productos/nuevo')
+    await wrapper.find('#p-name').setValue('Camiseta')
+    await wrapper.find('#p-name').trigger('input')
+    await wrapper.find('[aria-label="Talle 1"]').setValue('')
+    await wrapper.find('[aria-label="SKU 1"]').setValue('')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(api.admin.state.created).toHaveLength(0)
+    expect(wrapper.find('[aria-label="SKU 1"]').attributes('aria-invalid')).toBe('true')
+    expect(wrapper.find('[aria-label="Talle 1"]').attributes('aria-invalid')).toBe('true')
+    expect(wrapper.text()).toContain('Falta el SKU.')
+    expect(wrapper.text()).toContain('Falta el talle.')
+    expect(wrapper.find('[aria-label="SKU 2"]').attributes('aria-invalid')).toBe('false')
+
+    await wrapper.find('[aria-label="SKU 1"]').setValue('CAM-1')
+    expect(wrapper.find('[aria-label="SKU 1"]').attributes('aria-invalid')).toBe('false')
+  })
 })
