@@ -3,6 +3,7 @@ import { vi } from 'vitest'
 import type { Cart, CartItem } from '../api/cart'
 import type { Category, ProductDetail, ProductSummary } from '../api/catalog'
 import type {
+  AdminDomain,
   AdminProduct,
   AdminTheme,
   ConnectPaymentAccount,
@@ -408,6 +409,7 @@ function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
     state,
     theme: createThemeAdmin(),
     payments: createPaymentAdmin(),
+    domains: createDomainAdmin(),
     handle(method: string, path: string, body: Record<string, unknown>) {
       if (path === '/api/admin/categories') {
         return json([
@@ -724,6 +726,136 @@ function createPaymentAdmin() {
   }
 }
 
+// The domains screen's side of the Api (/api/admin/domains): a store with its platform subdomain, claims proven by a
+// TXT record a test "publishes" (`published`), the same refusals and status codes as the real one (its own tests
+// cover the rules), and `taken` for hosts another store already verified.
+function createDomainAdmin() {
+  const state = {
+    domains: [
+      {
+        id: 'dom-sub',
+        domain: 'regate.localhost',
+        type: 'Subdomain',
+        isPrimary: true,
+        verified: true,
+        verifiedAt: '2026-11-01T12:00:00Z',
+        tlsStatus: 'None',
+        tlsDetail: null,
+        instructions: null,
+      },
+    ] as AdminDomain[],
+    tokens: new Map<string, string>(),
+    published: new Set<string>(),
+    taken: new Set<string>(),
+    dnsDown: false,
+    certificate: { status: 'Pending', detail: 'Esperando el certificado.' } as {
+      status: AdminDomain['tlsStatus']
+      detail: string | null
+    },
+    removed: [] as string[],
+    counter: 0,
+  }
+
+  const problem = (field: string, message: string, status = 400) =>
+    json({ errors: { [field]: [message] } }, status)
+
+  return {
+    state,
+    handle(method: string, path: string, body: Record<string, unknown>) {
+      if (path === '/api/admin/domains' && method === 'GET') return json(state.domains)
+      if (path === '/api/admin/domains' && method === 'POST') {
+        const domain = String(body.domain ?? '')
+          .trim()
+          .toLowerCase()
+        if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(domain)) {
+          return problem(
+            'domain',
+            'Escribí un dominio como tienda.midominio.com, sin https:// ni barras.',
+          )
+        }
+        if (state.domains.some((d) => d.domain === domain)) {
+          return problem('domain', 'Ya agregaste este dominio.')
+        }
+        if (state.taken.has(domain)) {
+          return json({ detail: 'Ese dominio ya está en uso por otra tienda.' }, 409)
+        }
+        const id = `dom-${++state.counter}`
+        const token = `token${state.counter}`.padEnd(32, 'x')
+        state.tokens.set(id, token)
+        const claim: AdminDomain = {
+          id,
+          domain,
+          type: 'Custom',
+          isPrimary: false,
+          verified: false,
+          verifiedAt: null,
+          tlsStatus: 'None',
+          tlsDetail: null,
+          instructions: {
+            txtName: `_tiendazero.${domain}`,
+            txtValue: `tiendazero-verification=${token}`,
+            cnameTarget: 'stores.tienda.example',
+          },
+        }
+        state.domains.push(claim)
+        return json(claim, 201)
+      }
+
+      const match = /^\/api\/admin\/domains\/([^/]+)(?:\/(check|primary))?$/.exec(path)
+      const domain = match && state.domains.find((d) => d.id === match[1])
+      if (!match || !domain) return json({ status: 404 }, 404)
+
+      if (match[2] === 'check' && method === 'POST') {
+        if (domain.type !== 'Custom') return json({ status: 404 }, 404)
+        if (!domain.verified) {
+          if (state.dnsDown) {
+            return json(
+              { detail: 'No pudimos consultar el DNS ahora. Probá de nuevo en unos minutos.' },
+              502,
+            )
+          }
+          const value = `tiendazero-verification=${state.tokens.get(domain.id)}`
+          if (!state.published.has(`${domain.instructions!.txtName}=${value}`)) {
+            return problem(
+              'domain',
+              `Todavía no vemos el registro TXT en ${domain.instructions!.txtName}. Los cambios de DNS pueden tardar un rato en llegar.`,
+            )
+          }
+          if (state.taken.has(domain.domain)) {
+            return json({ detail: 'Ese dominio ya está en uso por otra tienda.' }, 409)
+          }
+          domain.verified = true
+          domain.verifiedAt = '2026-11-05T15:00:00Z'
+          domain.instructions = { ...domain.instructions!, txtValue: '' }
+        }
+        domain.tlsStatus = state.certificate.status
+        domain.tlsDetail = state.certificate.detail
+        return json(domain)
+      }
+      if (match[2] === 'primary' && method === 'POST') {
+        if (!domain.verified) {
+          return problem('domain', 'Verificá el dominio antes de hacerlo principal.')
+        }
+        state.domains.forEach((d) => (d.isPrimary = d.id === domain.id))
+        return json(domain)
+      }
+      if (!match[2] && method === 'DELETE') {
+        if (domain.type !== 'Custom') return json({ status: 404 }, 404)
+        if (domain.isPrimary) {
+          return problem(
+            'domain',
+            'Es el dominio principal. Elegí otro como principal antes de quitarlo.',
+          )
+        }
+        state.domains = state.domains.filter((d) => d.id !== domain.id)
+        state.removed.push(domain.domain)
+        return new Response(null, { status: 204 })
+      }
+      return json({ status: 404 }, 404)
+    },
+  }
+}
+
 // The platform side of the Api: a platform admin's session (cookie-backed, like the real one), the store list, and
 // the read-only preview of a store's public catalog. It is as strict as the real thing, so a Ui that forgets the
 // token or the header fails here instead of passing.
@@ -826,6 +958,9 @@ export function stubApi() {
       if (!email) return json({}, 401)
       const roles = api.auth.users.get(email)?.roles ?? []
       if (!roles.includes('TenantAdmin')) return json({}, 403)
+      if (url.pathname.startsWith('/api/admin/domains')) {
+        return adminServer.domains.handle(method, url.pathname, body)
+      }
       if (url.pathname === '/api/admin/payment-account') {
         return adminServer.payments.handle(method, body)
       }

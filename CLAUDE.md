@@ -114,6 +114,14 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
   has none). The token and secret inputs are `type=password`; the form is emptied after a save, "Cambiar
   credenciales" reopens it empty, "Desconectar" asks first (`window.confirm`). Field messages come from the Api.
   Tests: `adminPayments.spec.ts`; the fake Api's `api.admin.payments` accepts the tokens in `validTokens`.
+- Domains screen (Milestone 5, slice 2): `/admin/dominios` (`AdminDomainsView.vue`, "Dominios" in the admin sidebar, client in
+  `src/api/admin.ts`). Lists the store's domains: the platform subdomain (nothing to do on it except make it primary) and the
+  custom hosts it claimed. A claim shows the TXT record to publish (and the CNAME to point at) with "Verificar"; the Api
+  answers "not published yet" (400, shown under that domain), "couldn't read DNS" (502, a different message) or verifies it.
+  A verified host shows its certificate status (`tlsStatus`, refreshed by the same button) and can be made primary (a
+  `window.confirm` warns when its certificate is not active yet) or removed (the primary one has no "Quitar"). All the rules
+  (what a host may be, ownership, uniqueness, the limit of five) are the Api's; the Ui shows its Spanish messages.
+  Tests: `adminDomains.spec.ts`; the fake Api's `api.admin.domains` takes TXT records a test publishes in `published`.
 - **Changing Nocturne's tokens** (docs/plan.md §3 risk: two palettes to keep in sync). A new or retuned token needs a
   decision for each ground, then: (1) `src/assets/nocturne.css` stays a verbatim copy of the bundle's file, so
   re-copy it; (2) if it is chromatic or ground-dependent (bg, surface, text, divider, neutral steps, shadows,

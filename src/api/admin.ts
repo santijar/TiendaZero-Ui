@@ -285,3 +285,33 @@ export const connectPaymentAccount = (body: ConnectPaymentAccount) =>
   request<PaymentAccount>('PUT', '/api/admin/payment-account', { body })
 export const disconnectPaymentAccount = () =>
   request<PaymentAccount>('DELETE', '/api/admin/payment-account')
+
+// The store's domains (AdminDomainEndpoints in the Api): its platform subdomain plus custom hosts it claims. A claim
+// is proven by publishing a TXT record, then answered for like the subdomain. `instructions` is only on custom hosts;
+// once verified its txtValue is empty (the token is spent) but the CNAME target is still the one to point at.
+export interface DomainInstructions {
+  txtName: string
+  txtValue: string
+  cnameTarget: string | null
+}
+
+export interface AdminDomain {
+  id: string
+  domain: string
+  type: 'Subdomain' | 'Custom'
+  isPrimary: boolean
+  verified: boolean
+  verifiedAt: string | null
+  tlsStatus: 'None' | 'Pending' | 'Active' | 'Failed'
+  tlsDetail: string | null
+  instructions: DomainInstructions | null
+}
+
+export const listDomains = () => request<AdminDomain[]>('GET', '/api/admin/domains')
+export const claimDomain = (domain: string) =>
+  request<AdminDomain>('POST', '/api/admin/domains', { body: { domain } })
+export const checkDomain = (id: string) =>
+  request<AdminDomain>('POST', `/api/admin/domains/${id}/check`)
+export const makeDomainPrimary = (id: string) =>
+  request<AdminDomain>('POST', `/api/admin/domains/${id}/primary`)
+export const removeDomain = (id: string) => request<void>('DELETE', `/api/admin/domains/${id}`)

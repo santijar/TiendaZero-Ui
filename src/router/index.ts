@@ -131,6 +131,11 @@ export function createAppRouter(
             name: 'admin-payments',
             component: () => import('@/views/admin/AdminPaymentsView.vue'),
           },
+          {
+            path: 'dominios',
+            name: 'admin-domains',
+            component: () => import('@/views/admin/AdminDomainsView.vue'),
+          },
         ],
       },
       {
