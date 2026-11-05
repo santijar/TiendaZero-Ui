@@ -12,6 +12,7 @@ const LINKS = [
   { to: { name: 'admin-products' }, label: 'Productos' },
   { to: { name: 'admin-taxonomy' }, label: 'Categorías y colecciones' },
   { to: { name: 'admin-theme' }, label: 'Marca' },
+  { to: { name: 'admin-payments' }, label: 'Pagos' },
 ]
 const theme = useThemeStore()
 </script>

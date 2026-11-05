@@ -257,3 +257,31 @@ export function uploadThemeAsset(asset: ThemeAsset, file: File): Promise<AdminTh
 
 export const removeThemeAsset = (asset: ThemeAsset) =>
   request<AdminTheme>('DELETE', `/api/admin/theme/${asset}`)
+
+// The store's own Mercado Pago connection (AdminPaymentAccountEndpoints in the Api). Credentials go in once and
+// never come back: the Api answers the public key, the last four characters of the token and whether a webhook
+// secret is set. `webhookUrl` is what the store registers in its Mercado Pago application (absent or null where
+// the Api has no public address, like local development).
+export interface PaymentAccount {
+  provider: string
+  status: 'Connected' | 'Disconnected' | 'Error'
+  providerAccountId: string | null
+  accessTokenHint: string | null
+  publicKey: string | null
+  hasWebhookSecret: boolean
+  connectedAt: string | null
+  lastVerifiedAt: string | null
+  webhookUrl?: string | null
+}
+
+export interface ConnectPaymentAccount {
+  accessToken: string
+  publicKey: string
+  webhookSecret: string
+}
+
+export const getPaymentAccount = () => request<PaymentAccount>('GET', '/api/admin/payment-account')
+export const connectPaymentAccount = (body: ConnectPaymentAccount) =>
+  request<PaymentAccount>('PUT', '/api/admin/payment-account', { body })
+export const disconnectPaymentAccount = () =>
+  request<PaymentAccount>('DELETE', '/api/admin/payment-account')
