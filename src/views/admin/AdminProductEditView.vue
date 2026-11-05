@@ -57,6 +57,8 @@ const state = ref<'loading' | 'ready' | 'not-found' | 'error'>('loading')
 const saving = ref(false)
 const saved = ref(false)
 const errors = ref<Record<string, string>>({})
+// Per size row (by its key), what the editor found missing before sending.
+const rowErrors = ref<Record<number, { size?: string; sku?: string }>>({})
 const message = ref<string | null>(null)
 const stockConflict = ref(false)
 const uploading = ref(false)
@@ -169,12 +171,35 @@ function toBody(): SaveProduct {
   }
 }
 
+// Marks the rows the Api would reject, so the admin sees which field is missing.
+function checkSizes(): boolean {
+  const found: Record<number, { size?: string; sku?: string }> = {}
+  for (const row of sizes.value) {
+    fillSku(row)
+    const problem: { size?: string; sku?: string } = {}
+    if (!row.size.trim()) problem.size = 'Falta el talle.'
+    if (!row.sku.trim()) problem.sku = 'Falta el SKU.'
+    if (problem.size || problem.sku) found[row.key] = problem
+  }
+  rowErrors.value = found
+  return Object.keys(found).length === 0
+}
+
+function clearRowError(row: SizeRow, field: 'size' | 'sku') {
+  const problem = rowErrors.value[row.key]
+  if (problem) delete problem[field]
+}
+
 async function save() {
-  saving.value = true
   saved.value = false
   errors.value = {}
   message.value = null
   stockConflict.value = false
+  if (!checkSizes()) {
+    message.value = 'Revisá los campos marcados.'
+    return
+  }
+  saving.value = true
   try {
     if (props.id === undefined) {
       const created = await createProduct(toBody())
@@ -385,10 +410,26 @@ onMounted(load)
                     v-model="s.size"
                     class="input"
                     :aria-label="`Talle ${i + 1}`"
+                    :aria-invalid="!!rowErrors[s.key]?.size"
+                    @input="clearRowError(s, 'size')"
                     @blur="fillSku(s)"
                   />
+                  <span v-if="rowErrors[s.key]?.size" class="form-error" role="alert">
+                    {{ rowErrors[s.key]?.size }}
+                  </span>
                 </td>
-                <td><input v-model="s.sku" class="input" :aria-label="`SKU ${i + 1}`" /></td>
+                <td>
+                  <input
+                    v-model="s.sku"
+                    class="input"
+                    :aria-label="`SKU ${i + 1}`"
+                    :aria-invalid="!!rowErrors[s.key]?.sku"
+                    @input="clearRowError(s, 'sku')"
+                  />
+                  <span v-if="rowErrors[s.key]?.sku" class="form-error" role="alert">
+                    {{ rowErrors[s.key]?.sku }}
+                  </span>
+                </td>
                 <td class="admin-num">
                   <input
                     v-model.number="s.stock"
@@ -494,6 +535,10 @@ onMounted(load)
 <style scoped>
 .sizes .input {
   height: 32px;
+}
+
+.sizes .input[aria-invalid='true'] {
+  border-color: var(--color-accent-300);
 }
 
 .stock {
