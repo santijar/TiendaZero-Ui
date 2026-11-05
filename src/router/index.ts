@@ -126,6 +126,11 @@ export function createAppRouter(
             name: 'admin-theme',
             component: () => import('@/views/admin/AdminThemeView.vue'),
           },
+          {
+            path: 'pagos',
+            name: 'admin-payments',
+            component: () => import('@/views/admin/AdminPaymentsView.vue'),
+          },
         ],
       },
       {

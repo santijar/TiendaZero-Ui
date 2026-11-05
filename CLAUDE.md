@@ -106,6 +106,14 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
   reloads so the storefront and the admin shell wear the new look at once. The admin sidebar shows the store's name
   instead of the old bundled Regate logo (removed). `logoStyle.ts` is shared with the header.
   Tests: `adminTheme.spec.ts`; the fake Api's `api.admin.theme` records saves, previews and uploads.
+- Payments screen (Milestone 4, slice 3): `/admin/pagos` (`AdminPaymentsView.vue`, "Pagos" in the admin sidebar, client in
+  `src/api/admin.ts`). A store connects its own Mercado Pago account by pasting the access token, public key and
+  webhook secret (no OAuth); the Api verifies the token with Mercado Pago and stores all three encrypted. They are never
+  shown again: a connected store sees the account id, public key, the token's last four characters, whether a
+  secret is set and the webhook URL to register in its Mercado Pago application (`webhookUrl`, hidden when the Api
+  has none). The token and secret inputs are `type=password`; the form is emptied after a save, "Cambiar
+  credenciales" reopens it empty, "Desconectar" asks first (`window.confirm`). Field messages come from the Api.
+  Tests: `adminPayments.spec.ts`; the fake Api's `api.admin.payments` accepts the tokens in `validTokens`.
 - **Changing Nocturne's tokens** (docs/plan.md §3 risk: two palettes to keep in sync). A new or retuned token needs a
   decision for each ground, then: (1) `src/assets/nocturne.css` stays a verbatim copy of the bundle's file, so
   re-copy it; (2) if it is chromatic or ground-dependent (bg, surface, text, divider, neutral steps, shadows,

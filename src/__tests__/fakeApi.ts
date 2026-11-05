@@ -2,7 +2,15 @@ import { vi } from 'vitest'
 
 import type { Cart, CartItem } from '../api/cart'
 import type { Category, ProductDetail, ProductSummary } from '../api/catalog'
-import type { AdminProduct, AdminTheme, SaveProduct, SaveTheme, ThemeColors } from '../api/admin'
+import type {
+  AdminProduct,
+  AdminTheme,
+  ConnectPaymentAccount,
+  PaymentAccount,
+  SaveProduct,
+  SaveTheme,
+  ThemeColors,
+} from '../api/admin'
 import type { Order } from '../api/orders'
 import type { Theme } from '../api/theme'
 
@@ -399,6 +407,7 @@ function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
   return {
     state,
     theme: createThemeAdmin(),
+    payments: createPaymentAdmin(),
     handle(method: string, path: string, body: Record<string, unknown>) {
       if (path === '/api/admin/categories') {
         return json([
@@ -637,6 +646,84 @@ export const INDIANS_PRODUCTS: ProductSummary[] = [
   },
 ]
 
+// The store payments screen's side of the Api (/api/admin/payment-account): it accepts the tokens in `validTokens`
+// (Mercado Pago knows them) and answers like the real one, with no secret in any answer.
+function createPaymentAdmin() {
+  const state = {
+    account: {
+      provider: 'MercadoPago',
+      status: 'Disconnected',
+      providerAccountId: null,
+      accessTokenHint: null,
+      publicKey: null,
+      hasWebhookSecret: false,
+      connectedAt: null,
+      lastVerifiedAt: null,
+      webhookUrl: 'https://api.tienda.example/api/payments/webhooks/mercadopago/0197-regate',
+    } as PaymentAccount,
+    validTokens: new Map<string, string>([['APP_USR-regate-token-1234', '1000']]),
+    connects: [] as ConnectPaymentAccount[],
+    disconnects: 0,
+    down: false,
+  }
+
+  return {
+    state,
+    handle(method: string, body: Record<string, unknown>) {
+      if (method === 'GET') return json(state.account)
+      if (method === 'PUT') {
+        const request = body as unknown as ConnectPaymentAccount
+        const errors: Record<string, string[]> = {}
+        if (!request.accessToken) errors.accessToken = ['El access token es obligatorio.']
+        if (!request.publicKey) errors.publicKey = ['La public key es obligatoria.']
+        if (!request.webhookSecret)
+          errors.webhookSecret = ['La clave secreta de webhooks es obligatoria.']
+        if (Object.keys(errors).length) return json({ errors }, 400)
+        if (state.down)
+          return json(
+            {
+              title: 'Bad gateway',
+              detail: 'No pudimos comunicarnos con Mercado Pago. Probá de nuevo en unos minutos.',
+            },
+            502,
+          )
+        const accountId = state.validTokens.get(request.accessToken)
+        if (!accountId) {
+          return json(
+            { errors: { accessToken: ['Mercado Pago no reconoce este access token.'] } },
+            400,
+          )
+        }
+        state.connects.push(request)
+        state.account = {
+          ...state.account,
+          status: 'Connected',
+          providerAccountId: accountId,
+          accessTokenHint: '…' + request.accessToken.slice(-4),
+          publicKey: request.publicKey,
+          hasWebhookSecret: true,
+          connectedAt: '2026-11-05T15:00:00Z',
+          lastVerifiedAt: '2026-11-05T15:00:00Z',
+        }
+        return json(state.account)
+      }
+      if (method === 'DELETE') {
+        state.disconnects++
+        state.account = {
+          ...state.account,
+          status: 'Disconnected',
+          providerAccountId: null,
+          accessTokenHint: null,
+          publicKey: null,
+          hasWebhookSecret: false,
+        }
+        return json(state.account)
+      }
+      return json({ status: 404 }, 404)
+    },
+  }
+}
+
 // The platform side of the Api: a platform admin's session (cookie-backed, like the real one), the store list, and
 // the read-only preview of a store's public catalog. It is as strict as the real thing, so a Ui that forgets the
 // token or the header fails here instead of passing.
@@ -739,6 +826,9 @@ export function stubApi() {
       if (!email) return json({}, 401)
       const roles = api.auth.users.get(email)?.roles ?? []
       if (!roles.includes('TenantAdmin')) return json({}, 403)
+      if (url.pathname === '/api/admin/payment-account') {
+        return adminServer.payments.handle(method, body)
+      }
       if (url.pathname.startsWith('/api/admin/theme')) {
         const form = init?.body instanceof FormData ? init.body : null
         return adminServer.theme.handle(method, url.pathname, body, form)
