@@ -113,7 +113,13 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
   secret is set and the webhook URL to register in its Mercado Pago application (`webhookUrl`, hidden when the Api
   has none). The token and secret inputs are `type=password`; the form is emptied after a save, "Cambiar
   credenciales" reopens it empty, "Desconectar" asks first (`window.confirm`). Field messages come from the Api.
-  Tests: `adminPayments.spec.ts`; the fake Api's `api.admin.payments` accepts the tokens in `validTokens`.
+  The same screen has a second form, **Transferencia bancaria** (`getTransferAccount`/`saveTransferAccount`): the store's own
+  alias, CBU/CVU, holder and bank, shown to shoppers on the order page and in the email. A store with none (tag "Sin
+  configurar") does not offer transfers: the Api refuses a transfer order with a 400 on `paymentMethod`, and the checkout does
+  not yet hide the option (known gap). Details can be replaced but not removed. Two stores may connect the same Mercado Pago
+  seller account (one integration per store); nothing blocks it.
+  Tests: `adminPayments.spec.ts` (the Mercado Pago form is selected by `MP_FORM`, since the transfer form shares the page); the
+  fake Api's `api.admin.payments` accepts the tokens in `validTokens`, and `api.admin.transfer` keeps the transfer details.
 - Domains screen (Milestone 5, slice 2): `/admin/dominios` (`AdminDomainsView.vue`, "Dominios" in the admin sidebar, client in
   `src/api/admin.ts`). Lists the store's domains: the platform subdomain (nothing to do on it except make it primary) and the
   custom hosts it claimed. A claim shows the TXT record to publish (and the CNAME to point at) with "Verificar"; the Api
