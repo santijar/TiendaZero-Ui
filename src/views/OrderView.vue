@@ -207,7 +207,8 @@ onBeforeUnmount(() => {
               Te enviamos el detalle a {{ order.email }}.
             </template>
             <template v-else-if="order.fulfillment === 'ready-for-pickup'">
-              Retiralo en el showroom, de lunes a viernes de 10 a 19 h.
+              Retiralo en {{ order.pickup?.name ?? 'el local'
+              }}<template v-if="order.pickup?.details"> ({{ order.pickup.details }})</template>.
             </template>
             Número de pedido <span>{{ order.number }}</span
             >.

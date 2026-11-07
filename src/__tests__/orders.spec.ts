@@ -109,6 +109,56 @@ describe('checkout and orders', () => {
     expect(text).toContain('Transferencia −10%')
   })
 
+  describe('what the store offers at checkout', () => {
+    it("shows the store's own pickup point, with its hours", async () => {
+      api.checkoutOptions.pickup = { name: 'Indians Centro', details: 'Mar a sáb · 11 a 18 h' }
+      const wrapper = await checkoutWithCart()
+
+      await wrapper.find('input[name="del"][value="pickup"]').setValue()
+
+      expect(wrapper.find('.pickup').text()).toContain('Indians Centro')
+      expect(wrapper.find('.pickup').text()).toContain('Mar a sáb · 11 a 18 h')
+      expect(wrapper.text()).not.toContain('Showroom Regate')
+    })
+
+    it('hides the pickup option when the store has no pickup point', async () => {
+      api.checkoutOptions.pickup = null
+      const wrapper = await checkoutWithCart()
+
+      expect(wrapper.find('input[name="del"][value="pickup"]').exists()).toBe(false)
+      expect(wrapper.find('input[name="del"][value="home"]').exists()).toBe(true)
+    })
+
+    it('hides the transfer option when the store has no transfer details', async () => {
+      api.checkoutOptions.transfer = false
+      const wrapper = await checkoutWithCart()
+
+      expect(wrapper.find('input[name="pay"][value="transfer"]').exists()).toBe(false)
+      expect(wrapper.find('input[name="pay"][value="mercadopago"]').exists()).toBe(true)
+    })
+
+    it('offers both when the store has set them up', async () => {
+      const wrapper = await checkoutWithCart()
+
+      expect(wrapper.find('input[name="del"][value="pickup"]').exists()).toBe(true)
+      expect(wrapper.find('input[name="pay"][value="transfer"]').exists()).toBe(true)
+    })
+
+    it('still lets the shopper buy, with home delivery and Mercado Pago, if the options cannot be read', async () => {
+      const real = globalThis.fetch
+      vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) =>
+        String(input).includes('/api/checkout-options')
+          ? Promise.reject(new TypeError('network'))
+          : real(input, init),
+      )
+      const wrapper = await checkoutWithCart()
+
+      expect(wrapper.find('input[name="del"][value="pickup"]').exists()).toBe(false)
+      expect(wrapper.find('input[name="pay"][value="transfer"]').exists()).toBe(false)
+      expect(wrapper.find('input[name="pay"][value="mercadopago"]').exists()).toBe(true)
+    })
+  })
+
   it('names the lines that ran out of stock and keeps the shopper on checkout', async () => {
     const wrapper = await checkoutWithCart()
     api.orders.state.refuse = {
@@ -161,6 +211,40 @@ describe('checkout and orders', () => {
     expect(document.body.textContent).toContain('Transferí para confirmar')
     const reloaded = await mountAt('/pedido/RG-20001')
     expect(reloaded.text()).toContain('Transferí para confirmar')
+  })
+
+  it("tells the shopper where to collect a paid pickup order, in the store's own words", async () => {
+    api.checkoutOptions.pickup = { name: 'Indians Centro', details: 'Mar a sáb · 11 a 18 h' }
+    const wrapper = await checkoutWithCart()
+    await wrapper.find('input[name="del"][value="pickup"]').setValue()
+    await wrapper.find('#co-name').setValue('Juan Pérez')
+    await wrapper.find('#co-email').setValue('juan@mail.com')
+    await confirm(wrapper)
+    const order = api.orders.orders.get('RG-20001')!
+    expect(order.pickup).toEqual({ name: 'Indians Centro', details: 'Mar a sáb · 11 a 18 h' })
+    order.status = 'paid'
+    order.fulfillment = 'ready-for-pickup'
+
+    const page = await mountAt('/pedido/RG-20001?token=order-token-1')
+
+    expect(page.text()).toContain('Retiralo en Indians Centro (Mar a sáb · 11 a 18 h).')
+    expect(page.text()).not.toContain('showroom')
+  })
+
+  it('falls back to "el local" when the store has since removed its pickup point', async () => {
+    const wrapper = await checkoutWithCart()
+    await wrapper.find('input[name="del"][value="pickup"]').setValue()
+    await wrapper.find('#co-name').setValue('Juan Pérez')
+    await wrapper.find('#co-email').setValue('juan@mail.com')
+    await confirm(wrapper)
+    const order = api.orders.orders.get('RG-20001')!
+    order.status = 'paid'
+    order.fulfillment = 'ready-for-pickup'
+    order.pickup = null
+
+    const page = await mountAt('/pedido/RG-20001?token=order-token-1')
+
+    expect(page.text()).toContain('Retiralo en el local.')
   })
 
   it('checks the payment when the shopper comes back from Mercado Pago', async () => {

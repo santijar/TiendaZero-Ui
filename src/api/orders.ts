@@ -52,6 +52,25 @@ export interface Order {
   // Where a paid order is on its way; set by the store.
   fulfillment: 'unfulfilled' | 'preparing' | 'shipped' | 'ready-for-pickup' | 'delivered'
   trackingInfo: string | null
+  // Where to collect a pickup order; null for home delivery, or if the store has since removed it.
+  pickup: PickupInfo | null
+}
+
+// A store's pickup point: a name and free text for hours and lead time, both written by the store.
+export interface PickupInfo {
+  name: string
+  details: string
+}
+
+// What this store's checkout offers (GET /api/checkout-options): pickup, if it has set one up, and whether it takes bank
+// transfers. Mercado Pago is always listed.
+export interface CheckoutOptions {
+  pickup: PickupInfo | null
+  transfer: boolean
+}
+
+export function getCheckoutOptions(): Promise<CheckoutOptions> {
+  return request('GET', '/api/checkout-options')
 }
 
 export interface PlacedOrder {

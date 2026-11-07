@@ -303,6 +303,24 @@ export interface SaveTransferAccount {
   bank: string
 }
 
+// Where shoppers collect "retiro en local" orders (AdminPickupEndpoints in the Api). Without it the store does not offer
+// pickup, and it can be removed (orders already for pickup then say "en el local").
+export interface PickupSettings {
+  configured: boolean
+  name: string | null
+  details: string | null
+}
+
+export interface SavePickupSettings {
+  name: string
+  details: string
+}
+
+export const getPickupSettings = () => request<PickupSettings>('GET', '/api/admin/pickup')
+export const savePickupSettings = (body: SavePickupSettings) =>
+  request<PickupSettings>('PUT', '/api/admin/pickup', { body })
+export const removePickupSettings = () => request<PickupSettings>('DELETE', '/api/admin/pickup')
+
 export const getTransferAccount = () =>
   request<TransferAccount>('GET', '/api/admin/transfer-account')
 export const saveTransferAccount = (body: SaveTransferAccount) =>

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/http'
 import {
+  getCheckoutOptions,
   placeOrder as submitOrder,
+  type CheckoutOptions,
   startCheckout,
   type Delivery,
   type PaymentMethod,
@@ -33,6 +35,20 @@ const cart = useCartStore()
 
 const delivery = ref<Delivery>('home')
 const payment = ref<PaymentMethod>('mercadopago')
+
+// What this store offers. Until it loads (or if it fails) only home delivery and Mercado Pago show, which every store has.
+const options = ref<CheckoutOptions | null>(null)
+const pickup = computed(() => options.value?.pickup ?? null)
+const paymentMethods = computed(() =>
+  PAYMENT_METHODS.filter((m) => m.key !== 'transfer' || options.value?.transfer),
+)
+onMounted(async () => {
+  try {
+    options.value = await getCheckoutOptions()
+  } catch {
+    options.value = { pickup: null, transfer: false }
+  }
+})
 const busy = ref(false)
 const orderError = ref<string | null>(null)
 // One key for this checkout visit: retrying after a failed or lost response can't place the order
@@ -138,7 +154,7 @@ async function placeOrder() {
             <label class="seg-opt">
               <input v-model="delivery" type="radio" name="del" value="home" />Envío a domicilio
             </label>
-            <label class="seg-opt">
+            <label v-if="pickup" class="seg-opt">
               <input v-model="delivery" type="radio" name="del" value="pickup" />Retiro en local
             </label>
           </div>
@@ -191,16 +207,16 @@ async function placeOrder() {
               />
             </div>
           </div>
-          <div v-else class="card pickup">
-            <span class="pickup-name">Showroom Regate</span>
-            <span class="pickup-hours">Lun a vie · 10 a 19 h · Listo en 48 h</span>
+          <div v-else-if="pickup" class="card pickup">
+            <span class="pickup-name">{{ pickup.name }}</span>
+            <span v-if="pickup.details" class="pickup-hours">{{ pickup.details }}</span>
           </div>
         </div>
 
         <div class="step">
           <h6>Pago</h6>
           <label
-            v-for="m in PAYMENT_METHODS"
+            v-for="m in paymentMethods"
             :key="m.key"
             class="radio pay"
             :class="{ on: payment === m.key }"

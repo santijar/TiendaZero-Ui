@@ -120,6 +120,13 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
   seller account (one integration per store); nothing blocks it.
   Tests: `adminPayments.spec.ts` (the Mercado Pago form is selected by `MP_FORM`, since the transfer form shares the page); the
   fake Api's `api.admin.payments` accepts the tokens in `validTokens`, and `api.admin.transfer` keeps the transfer details.
+- Pickup screen: `/admin/retiro` (`AdminPickupView.vue`, "Retiro" in the admin sidebar, client in `src/api/admin.ts`). The store's pickup
+  point: a name and optional hours/lead-time text, shown at checkout, on the order page and in the emails. Without one the store offers only
+  home delivery; "Quitar el retiro" asks first. The checkout reads `GET /api/checkout-options` (`getCheckoutOptions`) on mount and shows
+  "Retiro en local" only if the store has a pickup point and "Transferencia" only if it has transfer details; until that answers (or if it
+  fails) only home delivery and Mercado Pago show. The order page says where to collect from `order.pickup`, or "el local" if it is null.
+  Tests: `adminPickup.spec.ts`, and `orders.spec.ts` ("what the store offers at checkout"); the fake Api's `api.checkoutOptions` models a
+  store without pickup or transfer, and `api.admin.pickup` keeps the settings.
 - Domains screen (Milestone 5, slice 2): `/admin/dominios` (`AdminDomainsView.vue`, "Dominios" in the admin sidebar, client in
   `src/api/admin.ts`). Lists the store's domains: the platform subdomain (nothing to do on it except make it primary) and the
   custom hosts it claimed. A claim shows the TXT record to publish (and the CNAME to point at) with "Verificar"; the Api
