@@ -239,3 +239,8 @@ Pages cannot take a wildcard custom domain (`*.yourdomain.com`), and stores are 
   Api started with `Proxy__Enabled=true Proxy__Secret=...` serves the SPA and its deep routes, resolves `regate.localhost` and
   `indians.localhost` to their own stores through `/api`, answers 404 for an unknown store, and ignores a forged `X-Forwarded-Host`.
   `npx wrangler deploy --dry-run` validates the configuration. Tests: `workerProxy.spec.ts`.
+- **Deploy on merge** (`deploy` job in `.github/workflows/ci.yml`): after a push to `main` whose CI passed, it builds and runs
+  `wrangler deploy`. It does nothing until the repository variable `DEPLOY_ENABLED` is `true`. Needs the secrets
+  `CLOUDFLARE_API_TOKEN` (permission to edit Workers) and `CLOUDFLARE_ACCOUNT_ID`, and the variable `VITE_PLATFORM_HOST`.
+  Not run yet: the first real deploy will be its test. Replace the `REPLACE-WITH-...` placeholders in `wrangler.jsonc` first, or
+  it publishes a Worker that proxies to nowhere (the Worker answers 500 "API_ORIGIN is not configured" while it is unset or still a placeholder).

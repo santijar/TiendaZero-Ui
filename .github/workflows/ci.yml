@@ -20,3 +20,30 @@ jobs:
       - run: npm run type-check
       - run: npm test
       - run: npm run build-only
+
+  # Publishes the Worker (the SPA plus the /api proxy) after a merge to main whose CI above passed.
+  # Off until the repository variable DEPLOY_ENABLED is "true", so CI stays green before Cloudflare is set up.
+  # Needs: secrets CLOUDFLARE_API_TOKEN (Workers edit permission) and CLOUDFLARE_ACCOUNT_ID; variable VITE_PLATFORM_HOST.
+  # The Worker's own settings (API_ORIGIN in wrangler.jsonc, the PROXY_SECRET secret) are set once, see CLAUDE.md "Deploying".
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-web
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build-only
+        env:
+          VITE_PLATFORM_HOST: ${{ vars.VITE_PLATFORM_HOST }}
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
