@@ -364,11 +364,20 @@ demoable product at every step.
    challenge), and TLS via **Cloudflare for SaaS** (confirmed) — budget its per-domain cost against
    the "lowest-cost" instinct behind the original deployment choice before onboarding many tenants
    onto custom domains.
-6. **Deploy** — unchanged mechanically from the original plan (Railway for `/api` + Postgres,
-   Cloudflare Pages for `/web`), plus: Pages/CDN routing needs to resolve *every* tenant's
-   subdomain (and later custom domain) to the same deployed SPA, and `/api`'s CORS policy needs to
-   allow an open-ended, data-driven set of tenant origins rather than a fixed list — both are
-   small but real changes from a single-tenant deploy, not copy-paste.
+6. **Deploy** — Railway for `/api` + Postgres, and a **Cloudflare Worker with static assets** for `/web`
+   (revised during Milestone 6; the original plan said Cloudflare Pages and a data-driven CORS policy):
+   - *Worker, not Pages:* Pages cannot take a wildcard custom domain (`*.yourdomain.com`), and stores are
+     created without touching Cloudflare. A Worker route can. It serves the SPA (index.html as the fallback for
+     every tenant's subdomain, and later custom domains) and runs code only for `/api/*` and `/media/*`.
+   - *No CORS:* the Api tells tenants apart by Host, so a store's `/api` calls must reach it *as that store's
+     host*. The Worker forwards them to the Api's own address with `X-Forwarded-Host`, the shopper's address and a
+     shared-secret header, and the Api (`Proxy__*`) honors them only with that secret. The browser only talks to its
+     own store's origin, so there is nothing to allow-list and the host-only `SameSite=Strict` cookie keeps working.
+   - *Migrations:* a `migrate` command run as Railway's pre-deploy step creates the schema as the owner and gives
+     the restricted runtime role its login; the dev-only seed flag is never used outside development.
+   - *Persistence:* a volume for the Data Protection key ring (lose it and every store must reconnect Mercado Pago)
+     and, until photos move to object storage, for uploads.
+   Details: `docs/deploy-railway.md` here and "Deploying" in the Ui's `CLAUDE.md`.
 
 ---
 
