@@ -1,0 +1,27 @@
+// Cloudflare Worker that serves the storefront for every store (docs/plan.md §8, Milestone 6) and carries /api and /media
+// to the Api. A Worker, not Pages, because Pages cannot take a wildcard custom domain (*.yourdomain.com), and stores are
+// created without touching Cloudflare. Deploy: `npm run build-only && npx wrangler deploy`. See "Deploying" in CLAUDE.md.
+{
+  "name": "tiendazero-web",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-11-01",
+
+  "assets": {
+    "directory": "./dist",
+    // Any route that is not a file answers index.html with 200, so the Vue router handles it.
+    "not_found_handling": "single-page-application",
+    // Only these reach the Worker; everything else is a static file.
+    "run_worker_first": ["/api/*", "/media/*"]
+  },
+
+  "vars": {
+    // The Api's own address, e.g. https://tiendazero-api.up.railway.app (no path). Not an `api.yourdomain.com`
+    // on the same zone: the wildcard route below would catch it.
+    "API_ORIGIN": "https://REPLACE-WITH-THE-API-ADDRESS"
+    // PROXY_SECRET is a secret, not a var: `npx wrangler secret put PROXY_SECRET` (same value as the Api's Proxy__Secret).
+  }
+
+  // Once the platform's domain is on Cloudflare, send every subdomain (stores and the platform admin) here, and later
+  // the custom domains of Cloudflare for SaaS (their fallback origin points at this zone):
+  // "routes": [{ "pattern": "*.REPLACE-WITH-YOUR-DOMAIN.com/*", "zone_name": "REPLACE-WITH-YOUR-DOMAIN.com" }]
+}
