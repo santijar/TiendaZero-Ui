@@ -118,10 +118,16 @@ describe('the Worker proxy to the Api', () => {
     expect(sent().headers.get('X-Proxy-Secret')).toBeNull()
   })
 
-  it('fails loudly, not silently, when the Api address is not configured', async () => {
+  it('fails loudly, not silently, when the Api address is not configured or still the placeholder', async () => {
     const response = await proxyToApi(new Request('https://regate.tienda.example/api/cart'), {})
 
     expect(response.status).toBe(500)
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    const placeholder = await proxyToApi(new Request('https://regate.tienda.example/api/cart'), {
+      API_ORIGIN: 'https://REPLACE-WITH-THE-API-ADDRESS',
+    })
+    expect(placeholder.status).toBe(500)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

@@ -16,7 +16,8 @@ export interface ProxyEnv {
 const FORWARDED = ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-proxy-secret', 'forwarded']
 
 export async function proxyToApi(request: Request, env: ProxyEnv): Promise<Response> {
-  if (!env.API_ORIGIN) {
+  // Unset, or still the placeholder in wrangler.jsonc: say so, instead of proxying to a host that does not exist.
+  if (!env.API_ORIGIN || env.API_ORIGIN.includes('REPLACE-WITH')) {
     return new Response('API_ORIGIN is not configured.', { status: 500 })
   }
 
