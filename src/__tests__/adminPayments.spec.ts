@@ -38,6 +38,9 @@ function signInAs(email: string, roles: string[]) {
   api.auth.state.session = email
 }
 
+// The Mercado Pago form (the transfer details have their own form on the same screen).
+const MP_FORM = 'form:not([aria-label="Transferencia bancaria"])'
+const transfer = () => api.admin.transfer.state
 const payments = () => api.admin.payments.state
 
 describe('the payments screen', () => {
@@ -62,7 +65,7 @@ describe('the payments screen', () => {
     await input('p-token').setValue(token)
     await input('p-key').setValue('APP_USR-public-key')
     await input('p-secret').setValue('the-secret')
-    await wrapper.find('form').trigger('submit')
+    await wrapper.find(MP_FORM).trigger('submit')
     await flushPromises()
   }
 
@@ -105,7 +108,7 @@ describe('the payments screen', () => {
     expect(wrapper.text()).toContain('Mercado Pago conectado')
     expect(wrapper.text()).toContain('Mercado Pago quedó conectado')
     // The form is gone and nothing typed is left in the page.
-    expect(wrapper.find('form').exists()).toBe(false)
+    expect(wrapper.find(MP_FORM).exists()).toBe(false)
     expect(wrapper.html()).not.toContain('APP_USR-regate-token-1234')
     expect(wrapper.html()).not.toContain('the-secret')
   })
@@ -123,7 +126,7 @@ describe('the payments screen', () => {
     await fillAndSubmit('APP_USR-made-up')
 
     expect(wrapper.text()).toContain('Mercado Pago no reconoce este access token.')
-    expect(wrapper.find('form').exists()).toBe(true)
+    expect(wrapper.find(MP_FORM).exists()).toBe(true)
     expect(wrapper.find('[aria-label="Cuenta conectada"]').exists()).toBe(false)
     expect(payments().connects).toEqual([])
   })
@@ -134,14 +137,14 @@ describe('the payments screen', () => {
     await fillAndSubmit()
 
     expect(wrapper.text()).toContain('No pudimos comunicarnos con Mercado Pago')
-    expect(wrapper.find('form').exists()).toBe(true)
+    expect(wrapper.find(MP_FORM).exists()).toBe(true)
   })
 
   it('shows a missing field next to it', async () => {
     await input('p-token').setValue('APP_USR-regate-token-1234')
     await input('p-key').setValue('pk')
     await input('p-secret').setValue('   ')
-    await wrapper.find('form').trigger('submit')
+    await wrapper.find(MP_FORM).trigger('submit')
     await flushPromises()
 
     expect(wrapper.text()).toContain('La clave secreta de webhooks es obligatoria.')
@@ -163,7 +166,7 @@ describe('the payments screen', () => {
 
       const cancel = wrapper.findAll('button').find((b) => b.text() === 'Cancelar')!
       await cancel.trigger('click')
-      expect(wrapper.find('form').exists()).toBe(false)
+      expect(wrapper.find(MP_FORM).exists()).toBe(false)
       expect(wrapper.find('[aria-label="Cuenta conectada"]').exists()).toBe(true)
     })
 
@@ -183,8 +186,83 @@ describe('the payments screen', () => {
       expect(payments().disconnects).toBe(1)
       expect(wrapper.text()).toContain('Mercado Pago sin conectar')
       expect(wrapper.text()).toContain('Mercado Pago quedó desconectado')
-      expect(wrapper.find('form').exists()).toBe(true)
+      expect(wrapper.find(MP_FORM).exists()).toBe(true)
       confirm.mockRestore()
+    })
+  })
+
+  it('shows the webhook url before connecting, because the secret only exists once it is registered', () => {
+    expect(payments().account.status).toBe('Disconnected')
+    expect(input('p-webhook-first').element.value).toBe(payments().account.webhookUrl)
+    expect(input('p-webhook-first').attributes('readonly')).toBeDefined()
+  })
+
+  describe('transfer details', () => {
+    const tform = () => wrapper.find('form[aria-label="Transferencia bancaria"]')
+
+    async function fillTransfer(
+      values: Partial<Record<'alias' | 'cbu' | 'holder' | 'bank', string>> = {},
+    ) {
+      const v = {
+        alias: 'TIENDA.PROPIA',
+        cbu: '0000003100012345678901',
+        holder: 'Tienda SRL',
+        bank: 'Banco Demo',
+        ...values,
+      }
+      await wrapper.find<HTMLInputElement>('#t-alias').setValue(v.alias)
+      await wrapper.find<HTMLInputElement>('#t-cbu').setValue(v.cbu)
+      await wrapper.find<HTMLInputElement>('#t-holder').setValue(v.holder)
+      await wrapper.find<HTMLInputElement>('#t-bank').setValue(v.bank)
+      await tform().trigger('submit')
+      await flushPromises()
+    }
+
+    it('says a store without details takes no transfers', () => {
+      expect(tform().exists()).toBe(true)
+      expect(wrapper.text()).toContain('Sin configurar')
+      expect(wrapper.text()).toContain('no ofrece pagar por transferencia')
+    })
+
+    it('saves the details and shows the store accepts transfers', async () => {
+      await fillTransfer()
+
+      expect(transfer().saves).toEqual([
+        {
+          alias: 'TIENDA.PROPIA',
+          cbu: '0000003100012345678901',
+          holder: 'Tienda SRL',
+          bank: 'Banco Demo',
+        },
+      ])
+      expect(wrapper.text()).toContain('Acepta transferencias')
+      expect(wrapper.text()).toContain('Guardamos los datos')
+    })
+
+    it('shows the saved details when the screen opens', async () => {
+      transfer().account = {
+        configured: true,
+        alias: 'YA.CARGADO',
+        cbu: '0000003100099999999999',
+        holder: 'Otro SA',
+        bank: 'Banco Otro',
+      }
+
+      const reopened = await mountAt('/admin/pagos')
+
+      expect(reopened.find<HTMLInputElement>('#t-alias').element.value).toBe('YA.CARGADO')
+      expect(reopened.find<HTMLInputElement>('#t-bank').element.value).toBe('Banco Otro')
+      expect(reopened.text()).toContain('Acepta transferencias')
+    })
+
+    it("marks each field the Api refuses, with the Api's message", async () => {
+      await fillTransfer({ alias: 'con espacios', cbu: '123' })
+
+      expect(transfer().saves).toHaveLength(0)
+      expect(wrapper.text()).toContain('sin espacios')
+      expect(wrapper.text()).toContain('El CBU o CVU tiene 22 números.')
+      expect(wrapper.text()).toContain('Revisá los campos marcados.')
+      expect(wrapper.text()).toContain('Sin configurar')
     })
   })
 
@@ -202,6 +280,6 @@ describe('the payments screen', () => {
     const reopened = await mountAt('/admin/pagos')
 
     expect(reopened.find('[aria-label="Cuenta conectada"]').text()).toContain('…9999')
-    expect(reopened.find('form').exists()).toBe(false)
+    expect(reopened.find(MP_FORM).exists()).toBe(false)
   })
 })

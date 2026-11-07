@@ -286,6 +286,28 @@ export const connectPaymentAccount = (body: ConnectPaymentAccount) =>
 export const disconnectPaymentAccount = () =>
   request<PaymentAccount>('DELETE', '/api/admin/payment-account')
 
+// Where the store's transfer orders are paid (AdminTransferAccountEndpoints in the Api). Until `configured`, the
+// store does not accept transfers (checkout is refused); once set it can be replaced but not removed.
+export interface TransferAccount {
+  configured: boolean
+  alias: string | null
+  cbu: string | null
+  holder: string | null
+  bank: string | null
+}
+
+export interface SaveTransferAccount {
+  alias: string
+  cbu: string
+  holder: string
+  bank: string
+}
+
+export const getTransferAccount = () =>
+  request<TransferAccount>('GET', '/api/admin/transfer-account')
+export const saveTransferAccount = (body: SaveTransferAccount) =>
+  request<TransferAccount>('PUT', '/api/admin/transfer-account', { body })
+
 // The store's domains (AdminDomainEndpoints in the Api): its platform subdomain plus custom hosts it claims. A claim
 // is proven by publishing a TXT record, then answered for like the subdomain. `instructions` is only on custom hosts;
 // once verified its txtValue is empty (the token is spent) but the CNAME target is still the one to point at.

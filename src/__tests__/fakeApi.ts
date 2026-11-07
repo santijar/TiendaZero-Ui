@@ -8,6 +8,8 @@ import type {
   AdminTheme,
   ConnectPaymentAccount,
   PaymentAccount,
+  SaveTransferAccount,
+  TransferAccount,
   SaveProduct,
   SaveTheme,
   ThemeColors,
@@ -409,6 +411,7 @@ function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
     state,
     theme: createThemeAdmin(),
     payments: createPaymentAdmin(),
+    transfer: createTransferAdmin(),
     domains: createDomainAdmin(),
     handle(method: string, path: string, body: Record<string, unknown>) {
       if (path === '/api/admin/categories') {
@@ -647,6 +650,41 @@ export const INDIANS_PRODUCTS: ProductSummary[] = [
     sizes: ['S', 'M'],
   },
 ]
+
+// The transfer details of the payments screen (/api/admin/transfer-account): answers like the real one, with the
+// same rules (alias without spaces, a 22-digit CBU, a holder and a bank), and can be replaced but not removed.
+function createTransferAdmin() {
+  const state = {
+    account: {
+      configured: false,
+      alias: null,
+      cbu: null,
+      holder: null,
+      bank: null,
+    } as TransferAccount,
+    saves: [] as SaveTransferAccount[],
+  }
+
+  return {
+    state,
+    handle(method: string, body: Record<string, unknown>) {
+      if (method === 'GET') return json(state.account)
+      if (method !== 'PUT') return json({}, 405)
+      const request = body as unknown as SaveTransferAccount
+      const errors: Record<string, string[]> = {}
+      if (!request.alias || /\s/.test(request.alias))
+        errors.alias = ['Ingresá el alias, sin espacios (hasta 60 caracteres).']
+      if (!/^\d{22}$/.test(request.cbu ?? '')) errors.cbu = ['El CBU o CVU tiene 22 números.']
+      if (!request.holder)
+        errors.holder = ['Ingresá el titular de la cuenta (hasta 120 caracteres).']
+      if (!request.bank) errors.bank = ['Ingresá el banco o la billetera (hasta 80 caracteres).']
+      if (Object.keys(errors).length) return json({ errors }, 400)
+      state.saves.push(request)
+      state.account = { configured: true, ...request }
+      return json(state.account)
+    },
+  }
+}
 
 // The store payments screen's side of the Api (/api/admin/payment-account): it accepts the tokens in `validTokens`
 // (Mercado Pago knows them) and answers like the real one, with no secret in any answer.
@@ -963,6 +1001,9 @@ export function stubApi() {
       }
       if (url.pathname === '/api/admin/payment-account') {
         return adminServer.payments.handle(method, body)
+      }
+      if (url.pathname === '/api/admin/transfer-account') {
+        return adminServer.transfer.handle(method, body)
       }
       if (url.pathname.startsWith('/api/admin/theme')) {
         const form = init?.body instanceof FormData ? init.body : null

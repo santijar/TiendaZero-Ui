@@ -5,7 +5,10 @@ import {
   connectPaymentAccount,
   disconnectPaymentAccount,
   getPaymentAccount,
+  getTransferAccount,
+  saveTransferAccount,
   type PaymentAccount,
+  type TransferAccount,
 } from '@/api/admin'
 import { ApiError } from '@/api/http'
 
@@ -23,12 +26,63 @@ const fieldErrors = reactive<Record<string, string>>({})
 const connected = computed(() => account.value?.status === 'Connected')
 const showForm = computed(() => !connected.value || editing.value)
 
+// Where transfer orders are paid. Each store has its own; without it the store does not take transfers.
+const transfer = ref<TransferAccount | null>(null)
+const transferForm = reactive({ alias: '', cbu: '', holder: '', bank: '' })
+const transferErrors = reactive<Record<string, string>>({})
+const transferBusy = ref(false)
+const transferNotice = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
+
+function fillTransferForm(t: TransferAccount) {
+  transferForm.alias = t.alias ?? ''
+  transferForm.cbu = t.cbu ?? ''
+  transferForm.holder = t.holder ?? ''
+  transferForm.bank = t.bank ?? ''
+}
+
+async function saveTransfer() {
+  transferBusy.value = true
+  Object.keys(transferErrors).forEach((k) => delete transferErrors[k])
+  transferNotice.value = null
+  try {
+    transfer.value = await saveTransferAccount({
+      alias: transferForm.alias.trim(),
+      cbu: transferForm.cbu.trim(),
+      holder: transferForm.holder.trim(),
+      bank: transferForm.bank.trim(),
+    })
+    fillTransferForm(transfer.value)
+    transferNotice.value = {
+      kind: 'ok',
+      text: 'Guardamos los datos. Se muestran a quienes pagan por transferencia.',
+    }
+  } catch (e) {
+    if (e instanceof ApiError && e.problem?.errors) {
+      for (const [field, messages] of Object.entries(e.problem.errors)) {
+        transferErrors[field] = messages[0] ?? ''
+      }
+      transferNotice.value = { kind: 'error', text: 'Revisá los campos marcados.' }
+    } else {
+      transferNotice.value = { kind: 'error', text: 'No pudimos guardar los datos.' }
+    }
+  } finally {
+    transferBusy.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     account.value = await getPaymentAccount()
     state.value = 'ready'
   } catch {
     state.value = 'error'
+    return
+  }
+  try {
+    transfer.value = await getTransferAccount()
+    fillTransferForm(transfer.value)
+  } catch {
+    transferNotice.value = { kind: 'error', text: 'No pudimos cargar los datos de transferencia.' }
   }
 })
 
@@ -178,10 +232,18 @@ const when = (iso: string | null) =>
             </li>
             <li>En «Credenciales de producción» copiá la Public Key y el Access Token.</li>
             <li>
-              En «Webhooks» cargá la URL de notificaciones que te mostramos al conectar, elegí el
-              evento «Pagos» y copiá la clave secreta.
+              En «Webhooks» cargá la URL de notificaciones que te mostramos más abajo, elegí el
+              evento «Pagos», guardá y copiá la clave secreta.
             </li>
           </ol>
+
+          <div v-if="!connected && account?.webhookUrl" class="field">
+            <label for="p-webhook-first">URL de notificaciones (webhooks)</label>
+            <input id="p-webhook-first" class="input mono" :value="account.webhookUrl" readonly />
+            <span class="admin-muted">
+              Cargala en tu aplicación de Mercado Pago antes de copiar la clave secreta.
+            </span>
+          </div>
 
           <div class="field">
             <label for="p-token">Access token</label>
@@ -244,6 +306,70 @@ const when = (iso: string | null) =>
       <p v-if="notice" :class="notice.kind === 'ok' ? 'form-note' : 'form-error'" role="status">
         {{ notice.text }}
       </p>
+
+      <form class="form-stack" aria-label="Transferencia bancaria" @submit.prevent="saveTransfer">
+        <section class="card admin-section">
+          <div class="admin-head">
+            <h2>Transferencia bancaria</h2>
+            <span v-if="transfer" class="tag">
+              {{ transfer.configured ? 'Acepta transferencias' : 'Sin configurar' }}
+            </span>
+          </div>
+          <p class="admin-muted">
+            Es la cuenta donde tus clientes transfieren. La ven en su pedido y en el email.
+            {{
+              transfer?.configured
+                ? 'Si la cambiás, los pedidos que siguen sin pagar muestran la cuenta nueva.'
+                : 'Hasta que la cargues, tu tienda no ofrece pagar por transferencia.'
+            }}
+          </p>
+          <div class="field">
+            <label for="t-alias">Alias</label>
+            <input
+              id="t-alias"
+              v-model="transferForm.alias"
+              class="input mono"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <span v-if="transferErrors.alias" class="form-error">{{ transferErrors.alias }}</span>
+          </div>
+          <div class="field">
+            <label for="t-cbu">CBU o CVU</label>
+            <input
+              id="t-cbu"
+              v-model="transferForm.cbu"
+              class="input mono"
+              inputmode="numeric"
+              autocomplete="off"
+              maxlength="22"
+            />
+            <span v-if="transferErrors.cbu" class="form-error">{{ transferErrors.cbu }}</span>
+          </div>
+          <div class="field">
+            <label for="t-holder">Titular</label>
+            <input id="t-holder" v-model="transferForm.holder" class="input" autocomplete="off" />
+            <span v-if="transferErrors.holder" class="form-error">{{ transferErrors.holder }}</span>
+          </div>
+          <div class="field">
+            <label for="t-bank">Banco o billetera</label>
+            <input id="t-bank" v-model="transferForm.bank" class="input" autocomplete="off" />
+            <span v-if="transferErrors.bank" class="form-error">{{ transferErrors.bank }}</span>
+          </div>
+        </section>
+        <div class="save-bar">
+          <button type="submit" class="btn btn-primary" :disabled="transferBusy">
+            Guardar datos de transferencia
+          </button>
+        </div>
+        <p
+          v-if="transferNotice"
+          :class="transferNotice.kind === 'ok' ? 'form-note' : 'form-error'"
+          role="status"
+        >
+          {{ transferNotice.text }}
+        </p>
+      </form>
     </div>
   </div>
 </template>
