@@ -4,6 +4,7 @@ import type { Cart, CartItem } from '../api/cart'
 import type { Category, ProductDetail, ProductSummary } from '../api/catalog'
 import type {
   AdminDomain,
+  AdminPromo,
   AdminProduct,
   AdminTheme,
   ConnectPaymentAccount,
@@ -11,6 +12,7 @@ import type {
   SaveTransferAccount,
   TransferAccount,
   SaveProduct,
+  SavePromo,
   SaveTheme,
   ThemeColors,
 } from '../api/admin'
@@ -412,6 +414,7 @@ function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
     theme: createThemeAdmin(),
     payments: createPaymentAdmin(),
     transfer: createTransferAdmin(),
+    promos: createPromoAdmin(),
     domains: createDomainAdmin(),
     handle(method: string, path: string, body: Record<string, unknown>) {
       if (path === '/api/admin/categories') {
@@ -767,6 +770,110 @@ function createPaymentAdmin() {
 // The domains screen's side of the Api (/api/admin/domains): a store with its platform subdomain, claims proven by a
 // TXT record a test "publishes" (`published`), the same refusals and status codes as the real one (its own tests
 // cover the rules), and `taken` for hosts another store already verified.
+// The home carousel (/api/admin/promos): answers like the real one, with its rules (a title and a button text, at most 8,
+// a slide only shows once it has a photo). `state.slides` is also what GET /api/promos lists, minus the ones without a photo.
+function createPromoAdmin() {
+  const REGATE_PROMOS: AdminPromo[] = [
+    {
+      id: 'promo-1',
+      imageUrl: '/media/brand/regate-promo-futbol.jpeg',
+      alt: 'Fútbol',
+      kicker: 'Fútbol',
+      title: 'Hecho para la cancha',
+      cta: 'Ver camisetas',
+      category: 'camisetas',
+      collection: null,
+    },
+    {
+      id: 'promo-2',
+      imageUrl: '/media/brand/regate-promo-estadio.jpeg',
+      alt: 'Estadio',
+      kicker: 'Temporada 26',
+      title: 'Salí a la cancha con Regate',
+      cta: 'Toda la tienda',
+      category: null,
+      collection: null,
+    },
+  ]
+  const state = {
+    slides: REGATE_PROMOS.map((p) => ({ ...p })),
+    uploads: [] as { id: string; name: string }[],
+    deleted: [] as string[],
+    reorders: [] as string[][],
+    next: 3,
+  }
+
+  function check(request: SavePromo) {
+    const errors: Record<string, string[]> = {}
+    if (!request.title) errors.title = ['Ingresá el título (hasta 80 caracteres).']
+    if (!request.cta) errors.cta = ['Ingresá el texto del botón (hasta 30 caracteres).']
+    if (request.category && request.collection)
+      errors.category = ['Elegí una categoría o una colección, no las dos.']
+    return errors
+  }
+
+  return {
+    state,
+    handle(method: string, path: string, body: Record<string, unknown>, form: FormData | null) {
+      const id = path.split('/')[4]
+      if (method === 'GET') return json(state.slides)
+      if (method === 'POST' && path === '/api/admin/promos') {
+        const request = body as unknown as SavePromo
+        if (state.slides.length >= 8) {
+          return json(
+            {
+              errors: {
+                slides: ['Podés tener hasta 8 promociones. Borrá alguna para sumar otra.'],
+              },
+            },
+            400,
+          )
+        }
+        const errors = check(request)
+        if (Object.keys(errors).length) return json({ errors }, 400)
+        const created: AdminPromo = {
+          id: `promo-${state.next++}`,
+          imageUrl: null,
+          ...request,
+          alt: request.alt || request.title,
+        }
+        state.slides.push(created)
+        return json(created, 201)
+      }
+      if (method === 'PUT' && path === '/api/admin/promos/order') {
+        const ids = (body as { ids: string[] }).ids
+        state.reorders.push(ids)
+        state.slides = ids.map((i) => state.slides.find((s) => s.id === i)!)
+        return json(state.slides)
+      }
+      const slide = state.slides.find((s) => s.id === id)
+      if (!slide) return json({}, 404)
+      if (method === 'PUT') {
+        const request = body as unknown as SavePromo
+        const errors = check(request)
+        if (Object.keys(errors).length) return json({ errors }, 400)
+        Object.assign(slide, request, { alt: request.alt || request.title })
+        return json(slide)
+      }
+      if (method === 'DELETE') {
+        state.deleted.push(slide.id)
+        state.slides = state.slides.filter((s) => s.id !== slide.id)
+        return new Response(null, { status: 204 })
+      }
+      if (method === 'POST' && path.endsWith('/image')) {
+        const file = form?.get('file') as File | null
+        if (!file || file.type === 'text/plain') {
+          return json({ errors: { file: ['Subí una foto JPG, PNG o WebP.'] } }, 400)
+        }
+        state.uploads.push({ id: slide.id, name: file.name })
+        slide.imageUrl = `/media/uploads/test/${file.name}`
+        return json(slide)
+      }
+      return json({}, 405)
+    },
+  }
+}
+
 function createDomainAdmin() {
   const state = {
     domains: [
@@ -976,6 +1083,9 @@ export function stubApi() {
       if (!store) return json({ status: 404 }, 404)
       const indians = store.slug === 'indians'
       if (url.pathname === '/api/theme') return json(indians ? INDIANS_THEME : REGATE_THEME)
+      if (url.pathname === '/api/promos') {
+        return json(indians ? [] : adminServer.promos.state.slides.filter((s) => s.imageUrl))
+      }
       if (url.pathname === '/api/categories') return json(indians ? INDIANS_CATEGORIES : CATEGORIES)
       if (url.pathname === '/api/collections') return json([])
       if (url.pathname === '/api/products') {
@@ -1002,6 +1112,10 @@ export function stubApi() {
       if (url.pathname === '/api/admin/payment-account') {
         return adminServer.payments.handle(method, body)
       }
+      if (url.pathname.startsWith('/api/admin/promos')) {
+        const form = init?.body instanceof FormData ? init.body : null
+        return adminServer.promos.handle(method, url.pathname, body, form)
+      }
       if (url.pathname === '/api/admin/transfer-account') {
         return adminServer.transfer.handle(method, body)
       }
@@ -1022,6 +1136,9 @@ export function stubApi() {
       const key = email ? `user:${email}` : headers.get('X-Cart-Token')
       if (email && !cartServer.carts.has(key!)) cartServer.carts.set(key!, [])
       return cartServer.handle(method, url.pathname, key, body)
+    }
+    if (url.pathname === '/api/promos') {
+      return json(adminServer.promos.state.slides.filter((s) => s.imageUrl))
     }
     if (url.pathname === '/api/theme') return json(theme.current)
     if (url.pathname === '/api/categories') return json(CATEGORIES)

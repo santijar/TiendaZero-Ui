@@ -1,41 +1,55 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
-import { PROMO_SLIDES } from '@/catalog/promos'
+import { getPromos, type Promo } from '@/api/promos'
 import { useCatalogStore } from '@/stores/catalog'
 import AppIcon from './AppIcon.vue'
 
 const AUTOPLAY_MS = 6000
 
+// The store's own slides. With none (or if they cannot be read) the home page simply has no carousel.
 const catalog = useCatalogStore()
+const slides = ref<Promo[]>([])
 const current = ref(0)
-const slide = computed(() => PROMO_SLIDES[current.value]!)
+const slide = computed(() => slides.value[current.value])
 let timer: ReturnType<typeof setInterval> | undefined
 
 function startAutoplay() {
   clearInterval(timer)
+  if (slides.value.length < 2) return
   timer = setInterval(
-    () => (current.value = (current.value + 1) % PROMO_SLIDES.length),
+    () => (current.value = (current.value + 1) % slides.value.length),
     AUTOPLAY_MS,
   )
 }
 
 function select(index: number) {
-  current.value = (index + PROMO_SLIDES.length) % PROMO_SLIDES.length
+  current.value = (index + slides.value.length) % slides.value.length
   startAutoplay()
 }
 
-onMounted(startAutoplay)
+function open(s: Promo) {
+  catalog.setFilter({ category: s.category ?? undefined, collection: s.collection ?? undefined })
+}
+
+onMounted(async () => {
+  try {
+    slides.value = await getPromos()
+  } catch {
+    slides.value = []
+  }
+  startAutoplay()
+})
 onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <template>
-  <section class="promo" aria-roledescription="carrusel">
+  <section v-if="slide" class="promo" aria-roledescription="carrusel">
     <div class="lighten photos">
       <img
-        v-for="(s, i) in PROMO_SLIDES"
-        :key="s.alt"
-        :src="s.image"
+        v-for="(s, i) in slides"
+        :key="s.id"
+        :src="s.imageUrl"
         :alt="s.alt"
         :style="{ opacity: i === current ? 1 : 0 }"
       />
@@ -43,10 +57,10 @@ onBeforeUnmount(() => clearInterval(timer))
     <div class="fade" />
     <div class="content">
       <div class="copy">
-        <span class="card-kicker kicker">{{ slide.kicker }}</span>
+        <span v-if="slide.kicker" class="card-kicker kicker">{{ slide.kicker }}</span>
         <span class="title">{{ slide.title }}</span>
         <div class="ctas">
-          <button type="button" class="btn btn-primary" @click="catalog.setFilter(slide.filter)">
+          <button type="button" class="btn btn-primary" @click="open(slide)">
             {{ slide.cta }}
           </button>
           <button type="button" class="btn btn-secondary" @click="catalog.setFilter({})">
@@ -54,7 +68,7 @@ onBeforeUnmount(() => clearInterval(timer))
           </button>
         </div>
       </div>
-      <div class="controls">
+      <div v-if="slides.length > 1" class="controls">
         <button
           type="button"
           class="btn btn-secondary btn-icon round"
@@ -65,8 +79,8 @@ onBeforeUnmount(() => clearInterval(timer))
         </button>
         <div class="dots">
           <button
-            v-for="(s, i) in PROMO_SLIDES"
-            :key="s.alt"
+            v-for="(s, i) in slides"
+            :key="s.id"
             type="button"
             :aria-label="s.title"
             :class="{ active: i === current }"
