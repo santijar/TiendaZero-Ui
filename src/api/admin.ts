@@ -172,6 +172,44 @@ export const reorderImages = (productId: number, imageIds: number[]) =>
 export const deleteImage = (productId: number, imageId: number) =>
   request<void>('DELETE', `/api/admin/products/${productId}/images/${imageId}`)
 
+// ---- home carousel ----
+
+// A slide of the store's home carousel (AdminPromoEndpoints in the Api). It is created first and its photo uploaded after; a
+// slide without a photo (`imageUrl` null) is not shown to shoppers. `category` / `collection` are slugs of the store's catalog.
+export interface AdminPromo {
+  id: string
+  imageUrl: string | null
+  alt: string
+  kicker: string
+  title: string
+  cta: string
+  category: string | null
+  collection: string | null
+}
+
+export interface SavePromo {
+  kicker: string
+  title: string
+  cta: string
+  alt: string
+  category: string | null
+  collection: string | null
+}
+
+export const getAdminPromos = () => request<AdminPromo[]>('GET', '/api/admin/promos')
+export const createPromo = (body: SavePromo) =>
+  request<AdminPromo>('POST', '/api/admin/promos', { body })
+export const updatePromo = (id: string, body: SavePromo) =>
+  request<AdminPromo>('PUT', `/api/admin/promos/${id}`, { body })
+export const deletePromo = (id: string) => request<void>('DELETE', `/api/admin/promos/${id}`)
+export function uploadPromoImage(id: string, file: File): Promise<AdminPromo> {
+  const form = new FormData()
+  form.append('file', file)
+  return request('POST', `/api/admin/promos/${id}/image`, { form })
+}
+export const reorderPromos = (ids: string[]) =>
+  request<AdminPromo[]>('PUT', '/api/admin/promos/order', { body: { ids } })
+
 // ---- orders ----
 
 export const getOrders = (filters: OrderFilters = {}) =>

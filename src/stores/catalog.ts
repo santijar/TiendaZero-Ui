@@ -10,7 +10,12 @@ import {
   type ProductSort,
   type ProductSummary,
 } from '@/api/catalog'
-import type { CatalogFilter } from '@/catalog/promos'
+
+// What a catalog filter can be set to: a category or a collection slug from the Api, or neither for the whole store.
+export interface CatalogFilter {
+  category?: string
+  collection?: string
+}
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 

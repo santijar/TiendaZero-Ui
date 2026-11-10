@@ -137,6 +137,11 @@ export function createAppRouter(
             component: () => import('@/views/admin/AdminPickupView.vue'),
           },
           {
+            path: 'promociones',
+            name: 'admin-promos',
+            component: () => import('@/views/admin/AdminPromosView.vue'),
+          },
+          {
             path: 'dominios',
             name: 'admin-domains',
             component: () => import('@/views/admin/AdminDomainsView.vue'),

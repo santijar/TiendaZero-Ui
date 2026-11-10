@@ -33,8 +33,9 @@ size's stock only when it was edited; on a 409 it offers to pull the current sto
 no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` and `.tag`
 (`src/assets/admin.css`).
 
-- The home promo carousel is static content in `src/catalog/promos.ts`. Each slide's CTA applies
-  a category or collection slug filter.
+- The home promo carousel (`PromoCarousel.vue`) shows the store's own slides from `GET /api/promos` (`src/api/promos.ts`): a photo,
+  a small text, a title and a button that applies a category or collection slug filter. With no slides there is no carousel, and
+  if they cannot be read the home page still works. The store manages them at `/admin/promociones` (below).
 - Session: the access token lives only in the auth store's memory. On page load, `auth.ready()`
   restores the session from the Api's httpOnly refresh cookie. `src/api/http.ts` adds the bearer
   token to every call and, on a 401 outside `/api/auth/`, refreshes once (one shared refresh for
@@ -92,8 +93,7 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
   `load()` whenever another store is picked and `reset()` when signed out. `AppHeader` draws the logo as a
   background (size, margin, filter and blend from the theme; with no blend set, a Dark store's logo uses
   `lighten`, a Light store's `normal`), else the wordmark, with the monogram badge when there is neither;
-  `AppFooter` shows `© year footerLegalName` and the first social link. Still Regate-specific, on purpose (later
-  work): the home promo slides (`src/catalog/promos.ts`) and the checkout's pickup text.
+  `AppFooter` shows `© year footerLegalName` and the first social link.
   Tests: `theme.spec.ts`; `fakeApi.ts` has `REGATE_THEME`/`INDIANS_THEME` and `api.theme.current`.
 - Branding editor (Milestone 3, slice 4): `/admin/marca` (`AdminThemeView.vue`, "Marca" in the admin sidebar, client in
   `src/api/admin.ts`). It edits the store name and legal name, mode, accent hue (or keeps Regate's hand-picked
@@ -127,6 +127,12 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
   fails) only home delivery and Mercado Pago show. The order page says where to collect from `order.pickup`, or "el local" if it is null.
   Tests: `adminPickup.spec.ts`, and `orders.spec.ts` ("what the store offers at checkout"); the fake Api's `api.checkoutOptions` models a
   store without pickup or transfer, and `api.admin.pickup` keeps the settings.
+- Promotions screen: `/admin/promociones` (`AdminPromosView.vue`, "Promociones" in the admin sidebar, client in `src/api/admin.ts`). The
+  store's home carousel: add a slide (small text, title, button text, what the button opens: a category, a collection or the whole
+  store, and an optional photo description), then upload its photo; a slide without a photo shows "No se muestra hasta que tenga foto"
+  and is not listed to shoppers. Edit, reorder (↑ ↓), delete (asks first). Eight at most. Photos are JPG/PNG/WebP, checked by the Api.
+  Tests: `promos.spec.ts` (the carousel on the home page and this screen); the fake Api's `api.admin.promos` keeps the slides and is what
+  `GET /api/promos` lists.
 - Domains screen (Milestone 5, slice 2): `/admin/dominios` (`AdminDomainsView.vue`, "Dominios" in the admin sidebar, client in
   `src/api/admin.ts`). Lists the store's domains: the platform subdomain (nothing to do on it except make it primary) and the
   custom hosts it claimed. A claim shows the TXT record to publish (and the CNAME to point at) with "Verificar"; the Api
