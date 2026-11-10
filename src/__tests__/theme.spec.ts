@@ -72,6 +72,37 @@ describe("a store's theme", () => {
     )
   })
 
+  describe("the footer's contact phone", () => {
+    const phone = (w: VueWrapper) => w.find('[data-testid="footer-phone"]')
+
+    it("shows the store's phone as typed, as a tel: link with only digits and a leading +", async () => {
+      api.theme.current = { ...REGATE_THEME, phone: '+54 (11) 5555-1234' }
+
+      const wrapper = await mountStore()
+
+      expect(phone(wrapper).text()).toBe('+54 (11) 5555-1234')
+      expect(phone(wrapper).attributes('href')).toBe('tel:+541155551234')
+    })
+
+    it('is absent when the store has no phone', async () => {
+      const wrapper = await mountStore()
+
+      expect(phone(wrapper).exists()).toBe(false)
+      expect(wrapper.find('footer').text()).not.toContain('tel:')
+    })
+
+    it('keeps the legal name and the social link next to the phone', async () => {
+      api.theme.current = { ...REGATE_THEME, phone: '+54 (11) 5555-1234' }
+
+      const wrapper = await mountStore()
+
+      const footer = wrapper.find('footer')
+      expect(footer.text()).toContain(`© ${new Date().getFullYear()} Regate Indumentaria`)
+      expect(footer.find('a[rel=noopener]').text()).toBe('@regate.indumentaria')
+      expect(footer.findAll('a')).toHaveLength(2)
+    })
+  })
+
   it('draws a light store as it is: no forced blend, its own logo size, the favicon from the theme', async () => {
     api.theme.current = INDIANS_THEME
 

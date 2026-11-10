@@ -257,6 +257,8 @@ export interface AdminTheme {
   // Where a shopper's reply to one of the store's emails goes (Reply-To). Emails are sent from one shared address, so without
   // this a reply reaches nobody.
   emailReplyTo: string | null
+  // Contact phone shown in the storefront footer; blank or null clears it.
+  phone: string | null
   preview: Theme
 }
 

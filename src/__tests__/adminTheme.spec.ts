@@ -282,6 +282,91 @@ describe('the branding editor', () => {
     })
   })
 
+  describe('the contact phone', () => {
+    const MESSAGE = 'Un teléfono con código de área, como +54 11 5555-1234.'
+    const field = () => input('t-phone').element.closest('.field')!
+    const submit = async (w: VueWrapper = wrapper) => {
+      await w.find('form').trigger('submit')
+      await flushPromises()
+    }
+
+    it('is labelled and starts empty for a store without a phone', () => {
+      expect(wrapper.find('label[for="t-phone"]').text()).toBe('Teléfono de contacto')
+      expect(input('t-phone').element.value).toBe('')
+    })
+
+    it('shows the stored phone when the editor opens', async () => {
+      api.admin.theme.state.theme.phone = '+54 11 5555-1234'
+
+      const reopened = await mountAt('/admin/marca')
+
+      expect(reopened.find<HTMLInputElement>('#t-phone').element.value).toBe('+54 11 5555-1234')
+    })
+
+    it('saves the phone and updates the preview theme', async () => {
+      await input('t-phone').setValue('+54 11 5555-1234')
+      await submit()
+
+      expect(last(api.admin.theme.state.saves).phone).toBe('+54 11 5555-1234')
+      expect(api.admin.theme.state.theme.phone).toBe('+54 11 5555-1234')
+      expect(api.admin.theme.state.theme.preview.phone).toBe('+54 11 5555-1234')
+      expect(wrapper.find('.save-bar').text()).toContain('Guardado')
+    })
+
+    it('shows the phone trimmed after saving, as the Api returns it', async () => {
+      await input('t-phone').setValue('  +54 11 5555-1234  ')
+      await submit()
+
+      expect(input('t-phone').element.value).toBe('+54 11 5555-1234')
+      expect(api.admin.theme.state.theme.phone).toBe('+54 11 5555-1234')
+    })
+
+    it.each([
+      ['', 'empty'],
+      ['   ', 'whitespace'],
+    ])('clears a stored phone when saved %j (%s)', async (value) => {
+      api.admin.theme.state.theme.phone = '+54 11 5555-1234'
+      const reopened = await mountAt('/admin/marca')
+
+      await reopened.find<HTMLInputElement>('#t-phone').setValue(value)
+      await submit(reopened)
+
+      expect(last(api.admin.theme.state.saves).phone).toBeNull()
+      expect(api.admin.theme.state.theme.phone).toBeNull()
+      expect(api.admin.theme.state.theme.preview.phone).toBeNull()
+    })
+
+    it.each([
+      ['letters', 'abc'],
+      ['too few digits', '12345'],
+      ['a plus in the middle', '+54+11 5555'],
+      ['more than 30 characters', '+54 11 5555-1234 5555-1234 5555'],
+      ['more than 15 digits', '1234567890123456'],
+    ])(
+      'shows the Api’s message under the field for %s, and stores nothing',
+      async (_name, value) => {
+        await input('t-phone').setValue(value)
+        await submit()
+
+        expect(field().querySelector('.form-error')!.textContent).toBe(MESSAGE)
+        expect(input('t-phone').element.value).toBe(value)
+        expect(api.admin.theme.state.saves).toHaveLength(0)
+        expect(api.admin.theme.state.theme.phone).toBeNull()
+      },
+    )
+
+    it('shows the hint while there is no error, and the error instead of it after', async () => {
+      expect(field().querySelector('.form-error')).toBeNull()
+      expect(field().querySelector('.admin-muted')!.textContent).toContain('Con código de área.')
+
+      await input('t-phone').setValue('abc')
+      await submit()
+
+      expect(field().querySelector('.form-error')).not.toBeNull()
+      expect(field().querySelector('.admin-muted')).toBeNull()
+    })
+  })
+
   it('drops the hand-picked accent when asked to, with a warning that it cannot come back', async () => {
     const check = wrapper.find<HTMLInputElement>('.admin-check input')
     expect(check.element.checked).toBe(true)
@@ -353,5 +438,57 @@ describe('the branding editor', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(last(api.admin.theme.state.saves).socialLinks).toHaveLength(1)
+  })
+})
+
+describe('the fake Api’s phone rule', () => {
+  beforeEach(() => {
+    api = stubApi()
+    signInAs('admin@mail.com', ['TenantAdmin'])
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  async function put(phone: unknown) {
+    const session = await (await fetch('/api/auth/refresh', { method: 'POST' })).json()
+    const response = await fetch('/api/admin/theme', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify({ storeName: 'Regate', useHandPickedAccent: true, phone }),
+    })
+    return { status: response.status, body: await response.json() }
+  }
+
+  it.each(['+54 11 5555-1234', '(011) 5555-1234', '1155551234', '+541155551234', '12 3456'])(
+    'accepts %j',
+    async (phone) => {
+      expect((await put(phone)).status).toBe(200)
+    },
+  )
+
+  it.each(['abc', '12345', '+54+11 5555', '+54 11 5555-1234 5555-1234 5555', '1234567890123456'])(
+    'refuses %j with the Api’s message',
+    async (phone) => {
+      const { status, body } = await put(phone)
+
+      expect(status).toBe(400)
+      expect(body.errors.phone).toEqual(['Un teléfono con código de área, como +54 11 5555-1234.'])
+    },
+  )
+
+  it.each([[''], ['   '], [null], [undefined]])('turns %j into no phone', async (phone) => {
+    api.admin.theme.state.theme.phone = '+54 11 5555-1234'
+
+    const { status, body } = await put(phone)
+
+    expect(status).toBe(200)
+    expect(body.phone).toBeNull()
+  })
+
+  it('returns the phone trimmed', async () => {
+    expect((await put('  +54 11 5555-1234 ')).body.phone).toBe('+54 11 5555-1234')
   })
 })
