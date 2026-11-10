@@ -49,6 +49,7 @@ const form = reactive<Form>({
   socialLinks: [],
   emailAccentHex: '',
   emailLogoUrl: null,
+  emailReplyTo: null,
 })
 const fieldErrors = reactive<Record<string, string>>({})
 const notice = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
@@ -78,6 +79,7 @@ function fill(theme: AdminTheme) {
     socialLinks: theme.socialLinks.map((l) => ({ ...l })),
     emailAccentHex: theme.emailAccentHex,
     emailLogoUrl: theme.emailLogoUrl,
+    emailReplyTo: theme.emailReplyTo,
   })
 }
 
@@ -196,6 +198,7 @@ async function save() {
       logoBlendMode: orNull(form.logoBlendMode),
       emailAccentHex: orNull(form.emailAccentHex),
       emailLogoUrl: orNull(form.emailLogoUrl),
+      emailReplyTo: orNull(form.emailReplyTo),
       socialLinks: form.socialLinks.filter((l) => l.label.trim() || l.url.trim()),
     })
     fill(saved)
@@ -277,7 +280,7 @@ const ratioText = (ratio: number | null) => (ratio === null ? '—' : `${ratio.t
     <p v-else-if="state === 'error'" class="form-error">No pudimos cargar la marca de la tienda.</p>
 
     <div v-else class="editor">
-      <form class="form-stack panel" @submit.prevent="save">
+      <form class="form-stack panel" novalidate @submit.prevent="save">
         <section class="card admin-section">
           <h2>La tienda</h2>
           <div class="field">
@@ -591,6 +594,27 @@ const ratioText = (ratio: number | null) => (ratio === null ? '—' : `${ratio.t
                 fieldErrors.emailLogoUrl
               }}</span>
             </div>
+          </div>
+          <div class="field">
+            <label for="t-email-reply">Dirección de respuesta</label>
+            <input
+              id="t-email-reply"
+              v-model="form.emailReplyTo"
+              class="input"
+              type="email"
+              autocomplete="off"
+              placeholder="contacto@tutienda.com"
+            />
+            <span v-if="fieldErrors.emailReplyTo" class="form-error">{{
+              fieldErrors.emailReplyTo
+            }}</span>
+            <span v-else-if="form.emailReplyTo?.trim()" class="admin-muted">
+              Cuando un cliente responde un mail de tu tienda, te llega acá.
+            </span>
+            <span v-else class="form-error" data-testid="reply-warning">
+              Sin dirección, las respuestas de tus clientes no le llegan a nadie. Cargá la dirección
+              donde querés recibirlas.
+            </span>
           </div>
         </section>
 

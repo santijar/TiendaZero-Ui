@@ -541,6 +541,7 @@ function createThemeAdmin() {
       ],
       emailAccentHex: '#9184d9',
       emailLogoUrl: null,
+      emailReplyTo: null,
       preview: REGATE_THEME,
     } as AdminTheme,
     saves: [] as SaveTheme[],
@@ -577,6 +578,12 @@ function createThemeAdmin() {
         if (!save.storeName?.trim()) {
           return json(
             { errors: { storeName: ['El nombre de la tienda tiene entre 1 y 80 caracteres.'] } },
+            400,
+          )
+        }
+        if (save.emailReplyTo && !/^[^s@<>,;"]+@[^s@<>,;"]+.[^s@<>,;"]+$/.test(save.emailReplyTo)) {
+          return json(
+            { errors: { emailReplyTo: ['Una dirección de correo como contacto@tutienda.com.'] } },
             400,
           )
         }

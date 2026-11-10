@@ -229,6 +229,59 @@ describe('the branding editor', () => {
     expect(api.admin.theme.state.saves).toHaveLength(0)
   })
 
+  describe('the address replies to emails go to', () => {
+    const warning = () => wrapper.find('[data-testid="reply-warning"]')
+
+    it('warns that replies reach nobody while the store has no address', () => {
+      expect(input('t-email-reply').element.value).toBe('')
+      expect(warning().exists()).toBe(true)
+      expect(warning().text()).toContain('no le llegan a nadie')
+    })
+
+    it('saves the address trimmed, and stops warning', async () => {
+      await input('t-email-reply').setValue('  contacto@regate.com  ')
+      expect(warning().exists()).toBe(false)
+      await wrapper.find('form').trigger('submit')
+      await flushPromises()
+
+      expect(last(api.admin.theme.state.saves).emailReplyTo).toBe('contacto@regate.com')
+      expect(wrapper.find('.save-bar').text()).toContain('Guardado')
+    })
+
+    it('shows the saved address when the editor opens', async () => {
+      api.admin.theme.state.theme.emailReplyTo = 'hola@regate.com'
+
+      const reopened = await mountAt('/admin/marca')
+
+      expect(reopened.find<HTMLInputElement>('#t-email-reply').element.value).toBe(
+        'hola@regate.com',
+      )
+      expect(reopened.find('[data-testid="reply-warning"]').exists()).toBe(false)
+    })
+
+    it('clears it when emptied', async () => {
+      api.admin.theme.state.theme.emailReplyTo = 'hola@regate.com'
+      const reopened = await mountAt('/admin/marca')
+
+      await reopened.find<HTMLInputElement>('#t-email-reply').setValue('   ')
+      await reopened.find('form').trigger('submit')
+      await flushPromises()
+
+      expect(last(api.admin.theme.state.saves).emailReplyTo).toBeNull()
+    })
+
+    it('shows the Api\x27s message under the field when the address is not valid, and keeps what was typed', async () => {
+      await input('t-email-reply').setValue('no-es-un-mail')
+      await wrapper.find('form').trigger('submit')
+      await flushPromises()
+
+      const field = input('t-email-reply').element.closest('.field')!
+      expect(field.textContent).toContain('Una dirección de correo como contacto@tutienda.com.')
+      expect(input('t-email-reply').element.value).toBe('no-es-un-mail')
+      expect(api.admin.theme.state.saves).toHaveLength(0)
+    })
+  })
+
   it('drops the hand-picked accent when asked to, with a warning that it cannot come back', async () => {
     const check = wrapper.find<HTMLInputElement>('.admin-check input')
     expect(check.element.checked).toBe(true)
