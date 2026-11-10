@@ -98,7 +98,9 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
 - Branding editor (Milestone 3, slice 4): `/admin/marca` (`AdminThemeView.vue`, "Marca" in the admin sidebar, client in
   `src/api/admin.ts`). It edits the store name and legal name, mode, accent hue (or keeps Regate's hand-picked
   accent), logo and favicon (uploaded, not typed), the logo's display settings, text mark and monogram, up to four
-  footer links, and the email accent and logo. The preview is a box that gets the Api's variables for the
+  footer links, the email accent and logo, and the **reply address** for the store's emails (`emailReplyTo`: the Api sends it as
+  Reply-To; with none set the field warns that replies reach nobody, because emails go out from one shared address). The form is
+  `novalidate`, so the Api's Spanish messages show instead of the browser's. The preview is a box that gets the Api's variables for the
   chosen mode (`POST /api/admin/theme/preview`, debounced 250 ms; the Ui still does no OKLCH math) and is not
   applied to the page. The **contrast check** (`src/lib/contrast.ts`, WCAG on the resolved hex values) shows the
   accent against the background and cards (3:1, Nocturne's rule) and the accent's text-on-tint pair (4.5:1) in

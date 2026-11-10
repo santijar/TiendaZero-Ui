@@ -254,6 +254,9 @@ export interface AdminTheme {
   socialLinks: SocialLinkInput[]
   emailAccentHex: string
   emailLogoUrl: string | null
+  // Where a shopper's reply to one of the store's emails goes (Reply-To). Emails are sent from one shared address, so without
+  // this a reply reaches nobody.
+  emailReplyTo: string | null
   preview: Theme
 }
 
