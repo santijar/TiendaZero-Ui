@@ -8,13 +8,15 @@ import type {
   AdminTheme,
   ConnectPaymentAccount,
   PaymentAccount,
+  PickupSettings,
+  SavePickupSettings,
   SaveTransferAccount,
   TransferAccount,
   SaveProduct,
   SaveTheme,
   ThemeColors,
 } from '../api/admin'
-import type { Order } from '../api/orders'
+import type { CheckoutOptions, Order } from '../api/orders'
 import type { Theme } from '../api/theme'
 
 export const CATEGORIES: Category[] = [
@@ -243,7 +245,10 @@ function createAuthServer(cartServer: ReturnType<typeof createCartServer>) {
 
 // A minimal orders server: placing an order converts the cart (its key stops working), and tests
 // can change an order's state directly (e.g. mark it paid, as a webhook would).
-function createOrderServer(cartServer: ReturnType<typeof createCartServer>) {
+function createOrderServer(
+  cartServer: ReturnType<typeof createCartServer>,
+  checkoutOptions: CheckoutOptions,
+) {
   const orders = new Map<string, Order & { token: string; owner: string | null }>()
   const state = {
     placed: [] as { body: Record<string, unknown>; idempotencyKey: string | null }[],
@@ -334,6 +339,7 @@ function createOrderServer(cartServer: ReturnType<typeof createCartServer>) {
           lastPaymentStatus: null,
           fulfillment: 'unfulfilled' as const,
           trackingInfo: null,
+          pickup: body.delivery === 'pickup' ? { ...checkoutOptions.pickup! } : null,
           token: `order-token-${orders.size + 1}`,
           owner: email,
         }
@@ -412,6 +418,7 @@ function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
     theme: createThemeAdmin(),
     payments: createPaymentAdmin(),
     transfer: createTransferAdmin(),
+    pickup: createPickupAdmin(),
     domains: createDomainAdmin(),
     handle(method: string, path: string, body: Record<string, unknown>) {
       if (path === '/api/admin/categories') {
@@ -650,6 +657,38 @@ export const INDIANS_PRODUCTS: ProductSummary[] = [
     sizes: ['S', 'M'],
   },
 ]
+
+// The pickup point of the pickup screen (/api/admin/pickup): answers like the real one, can be replaced and removed.
+function createPickupAdmin() {
+  const state = {
+    settings: { configured: false, name: null, details: null } as PickupSettings,
+    saves: [] as SavePickupSettings[],
+    removes: 0,
+  }
+
+  return {
+    state,
+    handle(method: string, body: Record<string, unknown>) {
+      if (method === 'GET') return json(state.settings)
+      if (method === 'DELETE') {
+        state.removes++
+        state.settings = { configured: false, name: null, details: null }
+        return json(state.settings)
+      }
+      if (method !== 'PUT') return json({}, 405)
+      const request = body as unknown as SavePickupSettings
+      if (!request.name) {
+        return json(
+          { errors: { name: ['Ingresá el nombre del lugar de retiro (hasta 80 caracteres).'] } },
+          400,
+        )
+      }
+      state.saves.push(request)
+      state.settings = { configured: true, name: request.name, details: request.details ?? '' }
+      return json(state.settings)
+    },
+  }
+}
 
 // The transfer details of the payments screen (/api/admin/transfer-account): answers like the real one, with the
 // same rules (alias without spaces, a 22-digit CBU, a holder and a bank), and can be replaced but not removed.
@@ -949,7 +988,12 @@ export type FakeApi = ReturnType<typeof stubApi>
 export function stubApi() {
   const cartServer = createCartServer()
   const authServer = createAuthServer(cartServer)
-  const orderServer = createOrderServer(cartServer)
+  // What the store's checkout offers (GET /api/checkout-options). A test changes it to model a store without pickup or transfer.
+  const checkoutOptions: CheckoutOptions = {
+    pickup: { name: 'Showroom Regate', details: 'Lun a vie · 10 a 19 h · Listo en 48 h' },
+    transfer: true,
+  }
+  const orderServer = createOrderServer(cartServer, checkoutOptions)
   const adminServer = createAdminServer(orderServer)
   const platformServer = createPlatformServer()
   // The theme of the store the fake "host" belongs to: Regate unless a test swaps it.
@@ -1005,6 +1049,9 @@ export function stubApi() {
       if (url.pathname === '/api/admin/transfer-account') {
         return adminServer.transfer.handle(method, body)
       }
+      if (url.pathname === '/api/admin/pickup') {
+        return adminServer.pickup.handle(method, body)
+      }
       if (url.pathname.startsWith('/api/admin/theme')) {
         const form = init?.body instanceof FormData ? init.body : null
         return adminServer.theme.handle(method, url.pathname, body, form)
@@ -1023,6 +1070,7 @@ export function stubApi() {
       if (email && !cartServer.carts.has(key!)) cartServer.carts.set(key!, [])
       return cartServer.handle(method, url.pathname, key, body)
     }
+    if (url.pathname === '/api/checkout-options') return json(checkoutOptions)
     if (url.pathname === '/api/theme') return json(theme.current)
     if (url.pathname === '/api/categories') return json(CATEGORIES)
     if (url.pathname === '/api/collections') return json([])
@@ -1043,6 +1091,7 @@ export function stubApi() {
     admin: adminServer,
     platform: platformServer,
     theme,
+    checkoutOptions,
   }
   return api
 }

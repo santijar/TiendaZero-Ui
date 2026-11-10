@@ -13,6 +13,7 @@ const LINKS = [
   { to: { name: 'admin-taxonomy' }, label: 'Categorías y colecciones' },
   { to: { name: 'admin-theme' }, label: 'Marca' },
   { to: { name: 'admin-payments' }, label: 'Pagos' },
+  { to: { name: 'admin-pickup' }, label: 'Retiro' },
   { to: { name: 'admin-domains' }, label: 'Dominios' },
 ]
 const theme = useThemeStore()
