@@ -377,7 +377,7 @@ demoable product at every step.
      the restricted runtime role its login; the dev-only seed flag is never used outside development.
    - *Persistence:* a volume for the Data Protection key ring (lose it and every store must reconnect Mercado Pago)
      and, until photos move to object storage, for uploads.
-   Details: `docs/deploy-railway.md` here and "Deploying" in the Ui's `CLAUDE.md`.
+   Details: `docs/deploy-railway.md` here and `docs/architecture/deploying.md` in the Ui repo.
 
 ---
 

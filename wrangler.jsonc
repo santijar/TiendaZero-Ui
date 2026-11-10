@@ -1,6 +1,6 @@
 // Cloudflare Worker that serves the storefront for every store (docs/plan.md §8, Milestone 6) and carries /api and /media
 // to the Api. A Worker, not Pages, because Pages cannot take a wildcard custom domain (*.yourdomain.com), and stores are
-// created without touching Cloudflare. Deploy: `npm run build-only && npx wrangler deploy`. See "Deploying" in CLAUDE.md.
+// created without touching Cloudflare. Deploy: `npm run build-only && npx wrangler deploy`. See docs/architecture/deploying.md.
 {
   "name": "tiendazero-web",
   "main": "worker/index.ts",
