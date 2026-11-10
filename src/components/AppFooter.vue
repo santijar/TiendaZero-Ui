@@ -7,11 +7,17 @@ const theme = computed(() => useThemeStore().theme)
 // The first social link, as in the design; the theme may carry more for later.
 const social = computed(() => theme.value?.socialLinks[0] ?? null)
 const year = new Date().getFullYear()
+// The Api keeps the phone as typed; a tel: link needs only digits and a leading +.
+const phoneHref = computed(() => {
+  const phone = theme.value?.phone
+  return phone ? `tel:${phone.replace(/[^\d+]/g, '')}` : null
+})
 </script>
 
 <template>
   <footer class="footer">
     <span v-if="theme">© {{ year }} {{ theme.footerLegalName }}</span>
+    <a v-if="phoneHref" :href="phoneHref" data-testid="footer-phone">{{ theme?.phone }}</a>
     <a v-if="social" :href="social.url" rel="noopener">{{ social.label }}</a>
   </footer>
 </template>

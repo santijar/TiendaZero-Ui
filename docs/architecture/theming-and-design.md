@@ -11,7 +11,8 @@ How a store's branding reaches the page, the Nocturne design tokens and what to 
   `load()` whenever another store is picked and `reset()` when signed out. `AppHeader` draws the logo as a
   background (size, margin, filter and blend from the theme; with no blend set, a Dark store's logo uses
   `lighten`, a Light store's `normal`), else the wordmark, with the monogram badge when there is neither;
-  `AppFooter` shows `© year footerLegalName` and the first social link.
+  `AppFooter` shows `© year footerLegalName`, the contact `phone` (only when set; a `tel:` link whose href keeps just
+  digits and a leading `+`, the text as the owner typed it; `data-testid="footer-phone"`) and the first social link.
   Tests: `theme.spec.ts`; `fakeApi.ts` has `REGATE_THEME`/`INDIANS_THEME` and `api.theme.current`.
 
 - Nocturne tokens/classes live in `src/assets/nocturne.css`, a verbatim copy of the bundle's

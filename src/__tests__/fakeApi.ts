@@ -542,6 +542,7 @@ function createThemeAdmin() {
       emailAccentHex: '#9184d9',
       emailLogoUrl: null,
       emailReplyTo: null,
+      phone: null,
       preview: REGATE_THEME,
     } as AdminTheme,
     saves: [] as SaveTheme[],
@@ -587,12 +588,29 @@ function createThemeAdmin() {
             400,
           )
         }
+        // Blank or omitted clears the phone; the Api stores it trimmed.
+        const phone = save.phone?.trim() || null
+        if (phone) {
+          const digits = phone.replace(/\D/g, '').length
+          if (phone.length > 30 || digits < 6 || digits > 15 || !/^\+?[\d\s\-()]+$/.test(phone)) {
+            return json(
+              { errors: { phone: ['Un teléfono con código de área, como +54 11 5555-1234.'] } },
+              400,
+            )
+          }
+        }
         state.saves.push(save)
         const { useHandPickedAccent, ...fields } = save
         Object.assign(theme, fields, {
+          phone,
           hasHandPickedAccent: theme.hasHandPickedAccent && useHandPickedAccent,
         })
-        theme.preview = { ...theme.preview, mode: theme.mode, storeName: theme.storeName }
+        theme.preview = {
+          ...theme.preview,
+          mode: theme.mode,
+          storeName: theme.storeName,
+          phone,
+        }
         return json(theme)
       }
       if (path === '/api/admin/theme/preview' && method === 'POST') {
@@ -1240,6 +1258,7 @@ export const REGATE_THEME: Theme = {
   socialLinks: [
     { label: '@regate.indumentaria', url: 'https://www.instagram.com/regate.indumentaria/' },
   ],
+  phone: null,
 }
 
 export const INDIANS_THEME: Theme = {
@@ -1259,4 +1278,5 @@ export const INDIANS_THEME: Theme = {
   monogram: 'IN',
   faviconUrl: '/media/brand/indians-favicon.png',
   socialLinks: [{ label: '@indians', url: 'https://www.instagram.com/' }],
+  phone: null,
 }

@@ -26,6 +26,8 @@ export interface Theme {
   monogram: string
   faviconUrl: string | null
   socialLinks: SocialLink[]
+  // The store's contact phone as its owner typed it; null when none is set.
+  phone: string | null
 }
 
 export function getTheme(): Promise<Theme> {

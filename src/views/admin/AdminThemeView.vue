@@ -50,6 +50,7 @@ const form = reactive<Form>({
   emailAccentHex: '',
   emailLogoUrl: null,
   emailReplyTo: null,
+  phone: null,
 })
 const fieldErrors = reactive<Record<string, string>>({})
 const notice = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
@@ -80,6 +81,7 @@ function fill(theme: AdminTheme) {
     emailAccentHex: theme.emailAccentHex,
     emailLogoUrl: theme.emailLogoUrl,
     emailReplyTo: theme.emailReplyTo,
+    phone: theme.phone,
   })
 }
 
@@ -199,6 +201,7 @@ async function save() {
       emailAccentHex: orNull(form.emailAccentHex),
       emailLogoUrl: orNull(form.emailLogoUrl),
       emailReplyTo: orNull(form.emailReplyTo),
+      phone: orNull(form.phone),
       socialLinks: form.socialLinks.filter((l) => l.label.trim() || l.url.trim()),
     })
     fill(saved)
@@ -614,6 +617,21 @@ const ratioText = (ratio: number | null) => (ratio === null ? '—' : `${ratio.t
             <span v-else class="form-error" data-testid="reply-warning">
               Sin dirección, las respuestas de tus clientes no le llegan a nadie. Cargá la dirección
               donde querés recibirlas.
+            </span>
+          </div>
+          <div class="field">
+            <label for="t-phone">Teléfono de contacto</label>
+            <input
+              id="t-phone"
+              v-model="form.phone"
+              class="input"
+              type="tel"
+              autocomplete="off"
+              placeholder="+54 11 5555-1234"
+            />
+            <span v-if="fieldErrors.phone" class="form-error">{{ fieldErrors.phone }}</span>
+            <span v-else class="admin-muted">
+              Con código de área. Aparece en el pie de la tienda; si lo dejás vacío, no se muestra.
             </span>
           </div>
         </section>
