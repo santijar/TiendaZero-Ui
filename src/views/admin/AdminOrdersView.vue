@@ -137,7 +137,7 @@ onMounted(load)
             <td>{{ formatDate(o.createdAt, true) }}</td>
             <td>
               {{ o.customerName }}
-              <div class="admin-muted">{{ o.email }}</div>
+              <div v-if="o.email" class="admin-muted">{{ o.email }}</div>
             </td>
             <td>
               {{ STATUS_LABELS[o.status] }}

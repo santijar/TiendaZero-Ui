@@ -54,7 +54,9 @@ async function act(action: () => Promise<AdminOrder>, confirmText?: string) {
 const confirmPaid = () =>
   act(
     () => markPaid(props.number),
-    `¿Confirmás que recibiste la transferencia de ${formatPrice(order.value!.total)}? Le avisamos al cliente por email.`,
+    order.value!.paymentMethod === 'cash'
+      ? `¿Confirmás que cobraste ${formatPrice(order.value!.total)} en efectivo?`
+      : `¿Confirmás que recibiste la transferencia de ${formatPrice(order.value!.total)}? Le avisamos al cliente por email.`,
   )
 
 const advance = (status: Fulfillment) =>
@@ -157,7 +159,7 @@ onMounted(load)
           </ul>
           <div v-if="data.canMarkPaid" class="admin-actions">
             <button type="button" class="btn btn-primary" :disabled="busy" @click="confirmPaid">
-              Recibí la transferencia
+              {{ order.paymentMethod === 'cash' ? 'Cobré en efectivo' : 'Recibí la transferencia' }}
             </button>
           </div>
           <p v-if="data.canMarkPaid && order.status === 'expired'" class="admin-muted">
@@ -174,9 +176,18 @@ onMounted(load)
             </div>
             <div v-if="order.shippingAddress">
               <dt>Dirección</dt>
-              <dd>{{ order.shippingAddress.street }} ({{ order.shippingAddress.postalCode }})</dd>
+              <dd>
+                {{ order.shippingAddress.street }}
+                <template v-if="order.shippingAddress.postalCode">
+                  ({{ order.shippingAddress.postalCode }})</template
+                >
+              </dd>
             </div>
-            <div v-if="order.status === 'paid'">
+            <div v-if="order.deliveryZone">
+              <dt>Zona</dt>
+              <dd>{{ order.deliveryZone }}</dd>
+            </div>
+            <div v-if="order.status === 'paid' || order.paymentMethod === 'cash'">
               <dt>Estado</dt>
               <dd>{{ FULFILLMENT_LABELS[order.fulfillment] }}</dd>
             </div>
@@ -208,8 +219,14 @@ onMounted(load)
                 {{ FULFILLMENT_LABELS[next] }}
               </button>
             </div>
-            <p class="admin-muted">Cada cambio le avisa al cliente por email.</p>
+            <p v-if="order.email" class="admin-muted">Cada cambio le avisa al cliente por email.</p>
           </template>
+          <p
+            v-else-if="order.status === 'expired' && order.paymentMethod === 'cash'"
+            class="admin-muted"
+          >
+            El pedido venció y su stock volvió a la venta.
+          </p>
           <p v-else-if="order.status !== 'paid'" class="admin-muted">
             Se puede preparar cuando el pedido esté pago.
           </p>
@@ -222,10 +239,17 @@ onMounted(load)
               <dt>Nombre</dt>
               <dd>{{ order.customerName }}</dd>
             </div>
+            <div v-if="order.phone">
+              <dt>Teléfono</dt>
+              <dd>
+                <a :href="`tel:${order.phone}`">{{ order.phone }}</a>
+              </dd>
+            </div>
             <div>
               <dt>Email</dt>
               <dd>
-                <a :href="`mailto:${order.email}`">{{ order.email }}</a>
+                <a v-if="order.email" :href="`mailto:${order.email}`">{{ order.email }}</a>
+                <template v-else>No dejó email</template>
               </dd>
             </div>
             <div>

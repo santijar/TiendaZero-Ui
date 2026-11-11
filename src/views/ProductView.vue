@@ -9,11 +9,13 @@ import { formatPrice, installmentsLabel } from '@/lib/commerce'
 import { isPlatformHost } from '@/lib/platform'
 import { useCartStore } from '@/stores/cart'
 import { useFavoritesStore } from '@/stores/favorites'
+import { useThemeStore } from '@/stores/theme'
 import NotFoundView from './NotFoundView.vue'
 
 const props = defineProps<{ slug: string }>()
 
 const cart = useCartStore()
+const theme = useThemeStore()
 const favorites = useFavoritesStore()
 // A platform admin's preview shows the product but offers no way to buy or save it.
 const preview = isPlatformHost()
@@ -23,6 +25,12 @@ const status = ref<'loading' | 'ready' | 'not-found' | 'error'>('loading')
 const size = ref<string | null>(null)
 const sizeError = ref(false)
 const isFavorite = computed(() => favorites.isFavorite(props.slug))
+// A grocery's product is sold by the pack: its one variant ("Unidad") is picked for the shopper and not shown. With
+// several (say 500 g and 1 kg) they are shown as "Presentación", not as clothing sizes.
+const sizeLabel = computed(() => (theme.isGrocery ? 'Presentación' : 'Talle'))
+const hideSizes = computed(
+  () => theme.isGrocery && product.value?.sizes.length === 1 && product.value.sizes[0]!.inStock,
+)
 
 // Main photo plus two detail shots; missing photos fall back to the empty image slot.
 const gallery = computed(() => {
@@ -103,19 +111,21 @@ function addToCart() {
           <span class="card-kicker">{{ product.categoryName }}</span>
           <h1>{{ product.name }}</h1>
           <span class="price">{{ formatPrice(product.price) }}</span>
-          <span class="installments">{{ installmentsLabel(product.price) }}</span>
+          <span v-if="!theme.isGrocery" class="installments">{{
+            installmentsLabel(product.price)
+          }}</span>
         </div>
         <p class="desc">{{ product.description }}</p>
-        <span class="color"
+        <span v-if="!theme.isGrocery" class="color"
           >Color · <span>{{ product.color }}</span></span
         >
 
-        <div class="sizes">
+        <div v-if="!hideSizes" class="sizes">
           <div class="sizes-head">
-            <span>Talle</span>
-            <a href="#" @click.prevent>Guía de talles</a>
+            <span>{{ sizeLabel }}</span>
+            <a v-if="!theme.isGrocery" href="#" @click.prevent>Guía de talles</a>
           </div>
-          <div class="size-options" role="radiogroup" aria-label="Talle">
+          <div class="size-options" role="radiogroup" :aria-label="sizeLabel">
             <button
               v-for="s in product.sizes"
               :key="s.size"
@@ -130,7 +140,9 @@ function addToCart() {
               {{ s.size }}
             </button>
           </div>
-          <span v-if="sizeError" class="size-error">Elegí un talle para continuar.</span>
+          <span v-if="sizeError" class="size-error"
+            >Elegí {{ theme.isGrocery ? 'una presentación' : 'un talle' }} para continuar.</span
+          >
         </div>
 
         <p v-if="preview" class="preview-note">
@@ -152,7 +164,7 @@ function addToCart() {
           </button>
         </div>
 
-        <div class="perks">
+        <div v-if="!theme.isGrocery" class="perks">
           <div><AppIcon name="truck" :size="18" />Envío gratis en todas las compras</div>
           <div><AppIcon name="return" :size="18" />Cambios gratis dentro de los 30 días</div>
         </div>

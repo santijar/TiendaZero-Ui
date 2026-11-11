@@ -11,6 +11,8 @@ import type {
   PaymentAccount,
   PickupSettings,
   SavePickupSettings,
+  CheckoutSettings,
+  SaveDeliveryZone,
   SaveTransferAccount,
   TransferAccount,
   SaveProduct,
@@ -68,6 +70,20 @@ export const TITULAR_DETAIL: ProductDetail = {
   images: [{ url: '/media/products/cam-titular.webp', alt: 'Camiseta Titular 26' }],
 }
 
+// A product with a single variant (a grocery's "Unidad", here the Bolso's "Único"), for the pages that pick it for the shopper.
+export const BOLSO_DETAIL: ProductDetail = {
+  slug: 'bolso',
+  name: 'Bolso Deportivo',
+  categorySlug: 'accesorios',
+  categoryName: 'Accesorios',
+  price: 54900,
+  color: 'Negro',
+  badge: null,
+  description: 'Bolso de 40 L.',
+  sizes: [{ size: 'Único', inStock: true }],
+  images: [],
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -110,11 +126,13 @@ function createCartServer() {
         return json(toCart(items))
       }
       if (method === 'POST' && path === '/api/cart/items') {
-        const product = PRODUCTS.find((p) => p.slug === body.productSlug)!
+        const product = PRODUCTS.find((p) => p.slug === body.productSlug)
+        if (!product) return json({ status: 404 }, 404)
         const size = String(body.size)
         const stock = STOCK[`${product.slug}/${size}`] ?? 99
         const existing = items.find((i) => i.productSlug === product.slug && i.size === size)
-        const quantity = (existing?.quantity ?? 0) + 1
+        const added = Number(body.quantity ?? 1)
+        const quantity = (existing?.quantity ?? 0) + added
         if (quantity > stock) return json({ stock, inCart: existing?.quantity ?? 0 }, 409)
         if (existing) setQty(existing, quantity)
         else {
@@ -125,8 +143,8 @@ function createCartServer() {
             size,
             color: product.color,
             unitPrice: product.price,
-            quantity: 1,
-            lineTotal: product.price,
+            quantity: added,
+            lineTotal: product.price * added,
             imageUrl: product.imageUrl,
             maxQuantity: stock,
           })
@@ -303,15 +321,40 @@ function createOrderServer(
         if (!items?.length) return json({ detail: 'Tu carrito está vacío.' }, 422)
         const subtotal = items.reduce((n, i) => n + i.lineTotal, 0)
         const transfer = body.paymentMethod === 'transfer'
+        const cash = body.paymentMethod === 'cash'
         const discount = transfer ? subtotal * 0.1 : 0
+        // A store with zones delivers by zone: the one named sets the shipping cost and a minimum order.
+        const zone =
+          body.delivery === 'home' && checkoutOptions.zones.length > 0
+            ? checkoutOptions.zones.find((z) => z.id === body.zoneId)
+            : undefined
+        if (body.delivery === 'home' && checkoutOptions.zones.length > 0 && !zone) {
+          return json({ errors: { zoneId: ['Elegí tu zona de entrega.'] } }, 400)
+        }
+        if (zone && subtotal < zone.minimumOrder) {
+          return json(
+            {
+              errors: {
+                zoneId: [`El pedido mínimo para ${zone.name} es $ ${zone.minimumOrder}.`],
+              },
+            },
+            400,
+          )
+        }
+        const shippingCost = zone?.cost ?? 0
         const number = `RG-${20001 + orders.size}`
         const order = {
           number,
           status: 'pending' as const,
-          paymentMethod: transfer ? ('transfer' as const) : ('mercadopago' as const),
+          paymentMethod: transfer
+            ? ('transfer' as const)
+            : cash
+              ? ('cash' as const)
+              : ('mercadopago' as const),
           delivery: body.delivery as 'home' | 'pickup',
-          email: String(body.email),
+          email: String(body.email ?? ''),
           customerName: String(body.name),
+          phone: typeof body.phone === 'string' ? body.phone : null,
           shippingAddress: (body.address as Order['shippingAddress']) ?? null,
           lines: items.map((i) => ({
             productSlug: i.productSlug,
@@ -324,11 +367,16 @@ function createOrderServer(
             lineTotal: i.lineTotal,
           })),
           subtotal,
-          shippingCost: 0,
+          shippingCost,
           discount,
-          total: subtotal - discount,
+          total: subtotal + shippingCost - discount,
+          deliveryZone: zone?.name ?? null,
           createdAt: '2026-11-02T15:00:00Z',
-          expiresAt: transfer ? '2026-11-04T15:00:00Z' : '2026-11-02T15:30:00Z',
+          expiresAt: transfer
+            ? '2026-11-04T15:00:00Z'
+            : cash
+              ? '2026-11-02T16:00:00Z'
+              : '2026-11-02T15:30:00Z',
           paidAt: null,
           transfer: transfer
             ? {
@@ -372,7 +420,10 @@ function createOrderServer(
 
 // A minimal /api/admin: orders (sharing the order server's orders) and an editable product whose
 // stock version tests can bump, as a sale would.
-function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
+function createAdminServer(
+  orderServer: ReturnType<typeof createOrderServer>,
+  checkoutOptions: CheckoutOptions,
+) {
   const product: AdminProduct = {
     id: 1,
     slug: 'cam-titular',
@@ -409,9 +460,12 @@ function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
       needsReview: false,
       reviewNotes: null,
       payments: [],
+      // A cash order is prepared before it is paid.
       nextFulfillment:
-        order.status === 'paid' ? path.slice(path.indexOf(order.fulfillment) + 1) : [],
-      canMarkPaid: order.paymentMethod === 'transfer' && order.status !== 'paid',
+        order.status === 'paid' || (order.status === 'pending' && order.paymentMethod === 'cash')
+          ? path.slice(path.indexOf(order.fulfillment) + 1)
+          : [],
+      canMarkPaid: order.paymentMethod !== 'mercadopago' && order.status !== 'paid',
     }
   }
 
@@ -421,6 +475,8 @@ function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
     payments: createPaymentAdmin(),
     transfer: createTransferAdmin(),
     pickup: createPickupAdmin(),
+    checkoutSettings: createCheckoutSettingsAdmin(checkoutOptions),
+    deliveryZones: createDeliveryZonesAdmin(checkoutOptions),
     promos: createPromoAdmin(),
     domains: createDomainAdmin(),
     handle(method: string, path: string, body: Record<string, unknown>) {
@@ -659,6 +715,7 @@ export const PLATFORM_TENANTS = [
     status: 'Active',
     orderNumberPrefix: 'RG',
     primaryDomain: 'regate.localhost',
+    kind: 'Standard',
   },
   {
     id: '02',
@@ -667,6 +724,7 @@ export const PLATFORM_TENANTS = [
     status: 'Active',
     orderNumberPrefix: 'IND',
     primaryDomain: 'indians.localhost',
+    kind: 'Standard',
   },
 ]
 
@@ -714,6 +772,97 @@ function createPickupAdmin() {
       state.saves.push(request)
       state.settings = { configured: true, name: request.name, details: request.details ?? '' }
       return json(state.settings)
+    },
+  }
+}
+
+// The checkout settings of the Cobros y WhatsApp screen (/api/admin/checkout-settings): the number is normalized to digits
+// and refused when it can't be dialed, like the real one. Saving also changes what the shopper's checkout offers.
+function createCheckoutSettingsAdmin(checkoutOptions: CheckoutOptions) {
+  const state = {
+    settings: { whatsappNumber: null, cash: false, mercadoPago: true } as CheckoutSettings,
+    saves: [] as CheckoutSettings[],
+  }
+
+  return {
+    state,
+    handle(method: string, body: Record<string, unknown>) {
+      if (method === 'GET') return json(state.settings)
+      if (method !== 'PUT') return json({}, 405)
+      const request = body as unknown as CheckoutSettings
+      const digits = (request.whatsappNumber ?? '').replace(/\D/g, '')
+      if (digits.length > 0 && (digits.length < 8 || digits.length > 15)) {
+        return json(
+          {
+            errors: {
+              whatsappNumber: [
+                'Ingresá el número con código de país, por ejemplo +54 9 11 5555-1234.',
+              ],
+            },
+          },
+          400,
+        )
+      }
+      state.saves.push(request)
+      state.settings = {
+        whatsappNumber: digits || null,
+        cash: request.cash,
+        mercadoPago: request.mercadoPago,
+      }
+      Object.assign(checkoutOptions, state.settings)
+      return json(state.settings)
+    },
+  }
+}
+
+// The delivery zones screen (/api/admin/delivery-zones): same rules as the real one (a name that is not repeated, amounts
+// from 0), and the zones it holds are what the shopper's checkout offers (checkoutOptions.zones).
+function createDeliveryZonesAdmin(checkoutOptions: CheckoutOptions) {
+  const state = { saves: [] as SaveDeliveryZone[], deletes: [] as string[], next: 1 }
+
+  function check(body: SaveDeliveryZone, id?: string) {
+    const errors: Record<string, string[]> = {}
+    if (!body.name) errors.name = ['Ingresá el nombre de la zona (hasta 80 caracteres).']
+    else if (
+      checkoutOptions.zones.some(
+        (z) => z.id !== id && z.name.toLowerCase() === body.name.toLowerCase(),
+      )
+    ) {
+      errors.name = ['Ya tenés una zona con ese nombre.']
+    }
+    if (body.cost === null || body.cost < 0) {
+      errors.cost = ['Ingresá cuánto cuesta el envío (0 si es gratis).']
+    }
+    if (body.minimumOrder === null || body.minimumOrder < 0) {
+      errors.minimumOrder = ['Ingresá el pedido mínimo (0 si no hay).']
+    }
+    return Object.keys(errors).length > 0 ? json({ errors }, 400) : null
+  }
+
+  return {
+    state,
+    handle(method: string, path: string, body: Record<string, unknown>) {
+      const id = path.split('/')[4]
+      if (method === 'GET') return json(checkoutOptions.zones)
+      if (method === 'DELETE') {
+        state.deletes.push(id!)
+        checkoutOptions.zones = checkoutOptions.zones.filter((z) => z.id !== id)
+        return new Response(null, { status: 204 })
+      }
+      const request = body as unknown as SaveDeliveryZone
+      const refused = check(request, id)
+      if (refused) return refused
+      state.saves.push(request)
+      const zone = {
+        id: id ?? `zone-${state.next++}`,
+        name: request.name,
+        cost: request.cost!,
+        minimumOrder: request.minimumOrder!,
+      }
+      checkoutOptions.zones = id
+        ? checkoutOptions.zones.map((z) => (z.id === id ? zone : z))
+        : [...checkoutOptions.zones, zone]
+      return json(zone, method === 'POST' ? 201 : 200)
     },
   }
 }
@@ -1124,9 +1273,13 @@ export function stubApi() {
   const checkoutOptions: CheckoutOptions = {
     pickup: { name: 'Showroom Regate', details: 'Lun a vie · 10 a 19 h · Listo en 48 h' },
     transfer: true,
+    cash: false,
+    mercadoPago: true,
+    whatsappNumber: null,
+    zones: [],
   }
   const orderServer = createOrderServer(cartServer, checkoutOptions)
-  const adminServer = createAdminServer(orderServer)
+  const adminServer = createAdminServer(orderServer, checkoutOptions)
   const platformServer = createPlatformServer()
   // The theme of the store the fake "host" belongs to: Regate unless a test swaps it.
   const theme: { current: Theme } = { current: REGATE_THEME }
@@ -1162,6 +1315,7 @@ export function stubApi() {
         return json({ items, total: items.length, page: 1, pageSize: 48 })
       }
       if (url.pathname === '/api/products/cam-titular' && !indians) return json(TITULAR_DETAIL)
+      if (url.pathname === '/api/products/bolso' && !indians) return json(BOLSO_DETAIL)
       return json({ status: 404 }, 404)
     }
     if (url.pathname.startsWith('/api/auth/')) {
@@ -1187,6 +1341,12 @@ export function stubApi() {
       }
       if (url.pathname === '/api/admin/transfer-account') {
         return adminServer.transfer.handle(method, body)
+      }
+      if (url.pathname.startsWith('/api/admin/delivery-zones')) {
+        return adminServer.deliveryZones.handle(method, url.pathname, body)
+      }
+      if (url.pathname === '/api/admin/checkout-settings') {
+        return adminServer.checkoutSettings.handle(method, body)
       }
       if (url.pathname === '/api/admin/pickup') {
         return adminServer.pickup.handle(method, body)
@@ -1222,6 +1382,7 @@ export function stubApi() {
       return json({ items, total: items.length, page: 1, pageSize: 48 })
     }
     if (url.pathname === '/api/products/cam-titular') return json(TITULAR_DETAIL)
+    if (url.pathname === '/api/products/bolso') return json(BOLSO_DETAIL)
     return json({ status: 404 }, 404)
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -1259,6 +1420,7 @@ export const REGATE_THEME: Theme = {
     { label: '@regate.indumentaria', url: 'https://www.instagram.com/regate.indumentaria/' },
   ],
   phone: null,
+  storeKind: 'Standard',
 }
 
 export const INDIANS_THEME: Theme = {
@@ -1279,4 +1441,5 @@ export const INDIANS_THEME: Theme = {
   faviconUrl: '/media/brand/indians-favicon.png',
   socialLinks: [{ label: '@indians', url: 'https://www.instagram.com/' }],
   phone: null,
+  storeKind: 'Standard',
 }

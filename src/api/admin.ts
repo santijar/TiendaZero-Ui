@@ -364,6 +364,43 @@ export const savePickupSettings = (body: SavePickupSettings) =>
   request<PickupSettings>('PUT', '/api/admin/pickup', { body })
 export const removePickupSettings = () => request<PickupSettings>('DELETE', '/api/admin/pickup')
 
+// How the store takes orders (AdminCheckoutSettingsEndpoints in the Api): the WhatsApp number that receives them and
+// whether it accepts cash and Mercado Pago. Without a saved row the Api answers the defaults of the store's kind.
+export interface CheckoutSettings {
+  whatsappNumber: string | null
+  cash: boolean
+  mercadoPago: boolean
+}
+
+export const getCheckoutSettings = () =>
+  request<CheckoutSettings>('GET', '/api/admin/checkout-settings')
+export const saveCheckoutSettings = (body: CheckoutSettings) =>
+  request<CheckoutSettings>('PUT', '/api/admin/checkout-settings', { body })
+
+// The areas the store delivers to (AdminDeliveryZoneEndpoints in the Api). Without any, a home delivery is free and
+// asks for a postal code; with one, shoppers must pick a zone.
+export interface DeliveryZone {
+  id: string
+  name: string
+  cost: number
+  minimumOrder: number
+}
+
+// Amounts are null when the box was left empty or isn't a number, so the Api answers with its own message.
+export interface SaveDeliveryZone {
+  name: string
+  cost: number | null
+  minimumOrder: number | null
+}
+
+export const getDeliveryZones = () => request<DeliveryZone[]>('GET', '/api/admin/delivery-zones')
+export const createDeliveryZone = (body: SaveDeliveryZone) =>
+  request<DeliveryZone>('POST', '/api/admin/delivery-zones', { body })
+export const updateDeliveryZone = (id: string, body: SaveDeliveryZone) =>
+  request<DeliveryZone>('PUT', `/api/admin/delivery-zones/${id}`, { body })
+export const deleteDeliveryZone = (id: string) =>
+  request<void>('DELETE', `/api/admin/delivery-zones/${id}`)
+
 export const getTransferAccount = () =>
   request<TransferAccount>('GET', '/api/admin/transfer-account')
 export const saveTransferAccount = (body: SaveTransferAccount) =>

@@ -12,6 +12,7 @@ import {
 } from '@/api/cart'
 import { ApiError } from '@/api/http'
 import { useAuthStore } from './auth'
+import { useThemeStore } from './theme'
 
 export interface CartLine {
   id: number
@@ -56,13 +57,13 @@ function writeToken(token: string | null) {
 
 const isNotFound = (error: unknown) => error instanceof ApiError && error.status === 404
 
-function stockMessage(error: unknown): string | null {
+// What the stock conflict means to the shopper: "de este talle" for clothes, "de este producto" for a grocery.
+function stockMessage(error: unknown, grocery = false): string | null {
   if (!(error instanceof ApiError) || error.status !== 409) return null
   const stock = Number(error.problem?.stock ?? 0)
-  if (stock === 0) return 'No queda stock de este talle.'
-  return stock === 1
-    ? 'Solo queda 1 unidad de este talle.'
-    : `Solo quedan ${stock} unidades de este talle.`
+  const of = grocery ? 'de este producto' : 'de este talle'
+  if (stock === 0) return `No queda stock ${of}.`
+  return stock === 1 ? `Solo queda 1 unidad ${of}.` : `Solo quedan ${stock} unidades ${of}.`
 }
 
 export const useCartStore = defineStore('cart', () => {
@@ -164,12 +165,55 @@ export const useCartStore = defineStore('cart', () => {
   async function add(product: { slug: string; name: string }, size: string): Promise<boolean> {
     try {
       await withCart((t) => addCartItem(t, { productSlug: product.slug, size }), true)
-      showToast('success', `${product.name} · Talle ${size} agregado`)
+      const grocery = useThemeStore().isGrocery
+      showToast(
+        'success',
+        grocery ? `${product.name} agregado` : `${product.name} · Talle ${size} agregado`,
+      )
       return true
     } catch (error) {
-      showToast('error', stockMessage(error) ?? 'No pudimos agregar el producto. Probá de nuevo.')
+      showToast(
+        'error',
+        stockMessage(error, useThemeStore().isGrocery) ??
+          'No pudimos agregar el producto. Probá de nuevo.',
+      )
       return false
     }
+  }
+
+  // Puts the lines of an earlier order in the cart (repeat order). Each line is added on its own, so one that is gone or
+  // short of stock doesn't stop the rest: it is added as far as stock allows and reported back in `issues`.
+  async function addLines(
+    wanted: { productSlug: string; name: string; size: string; quantity: number }[],
+  ): Promise<{ added: number; issues: string[] }> {
+    let added = 0
+    const issues: string[] = []
+    for (const line of wanted) {
+      const put = async (quantity: number) => {
+        await withCart(
+          (t) => addCartItem(t, { productSlug: line.productSlug, size: line.size, quantity }),
+          true,
+        )
+        added += quantity
+      }
+      try {
+        await put(line.quantity)
+      } catch (error) {
+        const stock = error instanceof ApiError && error.status === 409 ? error.problem : null
+        const free = stock ? Number(stock.stock ?? 0) - Number(stock.inCart ?? 0) : 0
+        if (free > 0) {
+          try {
+            await put(free)
+            issues.push(`${line.name}: solo pudimos sumar ${free}`)
+            continue
+          } catch {
+            // Falls through to the generic message.
+          }
+        }
+        issues.push(`${line.name}: ${stock ? 'no hay stock' : 'ya no está disponible'}`)
+      }
+    }
+    return { added, issues }
   }
 
   async function changeQty(line: CartLine, delta: number) {
@@ -179,7 +223,10 @@ export const useCartStore = defineStore('cart', () => {
       if (qty <= 0) await withCart((t) => removeCartItem(t, line.id))
       else await withCart((t) => updateCartItem(t, line.id, qty))
     } catch (error) {
-      showToast('error', stockMessage(error) ?? 'No pudimos actualizar el carrito.')
+      showToast(
+        'error',
+        stockMessage(error, useThemeStore().isGrocery) ?? 'No pudimos actualizar el carrito.',
+      )
     } finally {
       updating.value = false
     }
@@ -223,6 +270,7 @@ export const useCartStore = defineStore('cart', () => {
     afterOrderPlaced,
     reload,
     add,
+    addLines,
     changeQty,
     remove,
     clear,

@@ -11,6 +11,7 @@ export interface PlatformTenant {
   status: 'Active' | 'Suspended'
   orderNumberPrefix: string
   primaryDomain: string | null
+  kind: 'Standard' | 'Grocery'
 }
 
 export function platformLogin(body: { email: string; password: string }): Promise<Session> {

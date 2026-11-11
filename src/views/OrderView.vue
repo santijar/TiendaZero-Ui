@@ -3,14 +3,16 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/http'
-import { getOrder, startCheckout, syncOrder, type Order } from '@/api/orders'
+import { getCheckoutOptions, getOrder, startCheckout, syncOrder, type Order } from '@/api/orders'
 import AppIcon from '@/components/AppIcon.vue'
 import ProductImage from '@/components/ProductImage.vue'
 import { formatPrice, productCountLabel } from '@/lib/commerce'
 import { leaveTo } from '@/lib/navigation'
 import { orderToken, rememberOrderToken } from '@/lib/orderAccess'
+import { orderWhatsappUrl } from '@/lib/whatsapp'
 import { useAuthStore } from '@/stores/auth'
 import { useCatalogStore } from '@/stores/catalog'
+import { useThemeStore } from '@/stores/theme'
 
 // The order's page: /pedido/:number. Opened from the emailed link (?token=…), after checkout, and
 // on the way back from Mercado Pago, which appends its own query (payment_id, status, …). Those
@@ -24,8 +26,16 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const catalog = useCatalogStore()
+const theme = useThemeStore()
 
 const order = ref<Order | null>(null)
+// The store's WhatsApp number from its checkout options; null when it has none (or they could not be read).
+const whatsappNumber = ref<string | null>(null)
+const whatsappUrl = computed(() =>
+  order.value && whatsappNumber.value && order.value.status !== 'expired'
+    ? orderWhatsappUrl(whatsappNumber.value, order.value)
+    : null,
+)
 const state = ref<'loading' | 'ready' | 'not-found' | 'error'>('loading')
 const paying = ref(false)
 const payError = ref<string | null>(null)
@@ -60,8 +70,14 @@ const paymentNote = computed(() => {
 })
 
 // A paid order's way to the shopper, as the store moves it along.
+// A cash order is prepared before it is paid, so it is followed through the same steps from "received".
+const cashInProgress = computed(
+  () => order.value?.status === 'pending' && order.value.paymentMethod === 'cash',
+)
 const fulfillmentSteps = computed(() => [
-  { key: 'paid', label: 'Pagado' },
+  cashInProgress.value
+    ? { key: 'unfulfilled', label: 'Recibido' }
+    : { key: 'paid', label: 'Pagado' },
   { key: 'preparing', label: 'Preparando' },
   order.value?.delivery === 'pickup'
     ? { key: 'ready-for-pickup', label: 'Listo para retirar' }
@@ -83,7 +99,7 @@ const fulfillmentTitle = computed(() => {
     case 'delivered':
       return '¡Pedido entregado!'
     default:
-      return '¡Pedido confirmado!'
+      return cashInProgress.value ? 'Recibimos tu pedido' : '¡Pedido confirmado!'
   }
 })
 
@@ -102,6 +118,9 @@ async function load() {
   const returningFromMercadoPago = 'payment_id' in rest || 'collection_status' in rest
 
   await auth.ready()
+  void getCheckoutOptions()
+    .then((o) => (whatsappNumber.value = o.whatsappNumber))
+    .catch(() => {})
   try {
     order.value = await getOrder(props.number, token)
     state.value = 'ready'
@@ -199,11 +218,15 @@ onBeforeUnmount(() => {
 
     <template v-else>
       <div class="head">
-        <template v-if="order.status === 'paid'">
+        <template v-if="order.status === 'paid' || cashInProgress">
           <div class="badge"><AppIcon name="check" :size="28" :stroke-width="18" /></div>
           <h1>{{ fulfillmentTitle }}</h1>
           <p class="lead">
-            <template v-if="order.fulfillment === 'unfulfilled'">
+            <template v-if="cashInProgress && order.fulfillment !== 'delivered'">
+              Pagás <span>{{ formatPrice(order.total) }}</span> en efectivo
+              {{ order.delivery === 'pickup' ? 'cuando lo retirás' : 'cuando te lo entregamos' }}.
+            </template>
+            <template v-if="order.fulfillment === 'unfulfilled' && order.email">
               Te enviamos el detalle a {{ order.email }}.
             </template>
             <template v-else-if="order.fulfillment === 'ready-for-pickup'">
@@ -232,8 +255,14 @@ onBeforeUnmount(() => {
         <template v-else-if="order.status === 'expired'">
           <h1>El pedido venció</h1>
           <p class="lead">
-            No recibimos el pago de <span>{{ order.number }}</span> a tiempo, así que los productos
-            volvieron a estar a la venta.
+            <template v-if="order.paymentMethod === 'cash'">
+              No llegamos a preparar <span>{{ order.number }}</span> a tiempo, así que los productos
+              volvieron a estar a la venta.
+            </template>
+            <template v-else>
+              No recibimos el pago de <span>{{ order.number }}</span> a tiempo, así que los
+              productos volvieron a estar a la venta.
+            </template>
           </p>
         </template>
 
@@ -242,7 +271,9 @@ onBeforeUnmount(() => {
           <p class="lead">
             Reservamos tu pedido <span>{{ order.number }}</span> hasta el {{ deadline }} h.
             Transferí <span>{{ formatPrice(order.total) }}</span> a esta cuenta y lo confirmamos
-            apenas se acredite. También te enviamos estos datos a {{ order.email }}.
+            apenas se acredite.<template v-if="order.email">
+              También te enviamos estos datos a {{ order.email }}.</template
+            >
           </p>
           <dl v-if="order.transfer" class="card transfer">
             <div>
@@ -287,8 +318,18 @@ onBeforeUnmount(() => {
           <span v-if="payError" class="form-error" role="alert">{{ payError }}</span>
         </template>
 
+        <a
+          v-if="whatsappUrl"
+          :href="whatsappUrl"
+          class="btn btn-secondary"
+          target="_blank"
+          rel="noopener"
+        >
+          Enviar mi pedido por WhatsApp
+        </a>
+
         <button
-          v-if="order.status !== 'pending'"
+          v-if="order.status !== 'pending' || cashInProgress"
           type="button"
           class="btn btn-primary"
           @click="keepShopping"
@@ -307,7 +348,11 @@ onBeforeUnmount(() => {
           </div>
           <div class="line-info">
             <span class="line-name">{{ l.name }}</span>
-            <span class="line-meta">Talle {{ l.size }} · x{{ l.quantity }}</span>
+            <span class="line-meta"
+              ><template v-if="!theme.isGrocery">Talle {{ l.size }} · </template>x{{
+                l.quantity
+              }}</span
+            >
           </div>
           <span class="line-total">{{ formatPrice(l.lineTotal) }}</span>
         </div>
@@ -331,7 +376,11 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <span v-if="order.shippingAddress" class="ship-to">
-          Envío a {{ order.shippingAddress.street }} ({{ order.shippingAddress.postalCode }})
+          Envío a {{ order.shippingAddress.street
+          }}<template v-if="order.deliveryZone"> ({{ order.deliveryZone }})</template
+          ><template v-else-if="order.shippingAddress.postalCode">
+            ({{ order.shippingAddress.postalCode }})</template
+          >
         </span>
       </aside>
     </template>

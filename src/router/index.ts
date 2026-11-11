@@ -137,6 +137,21 @@ export function createAppRouter(
             component: () => import('@/views/admin/AdminPickupView.vue'),
           },
           {
+            path: 'compartir',
+            name: 'admin-share',
+            component: () => import('@/views/admin/AdminShareView.vue'),
+          },
+          {
+            path: 'zonas',
+            name: 'admin-delivery-zones',
+            component: () => import('@/views/admin/AdminDeliveryZonesView.vue'),
+          },
+          {
+            path: 'cobros',
+            name: 'admin-checkout-settings',
+            component: () => import('@/views/admin/AdminCheckoutSettingsView.vue'),
+          },
+          {
             path: 'promociones',
             name: 'admin-promos',
             component: () => import('@/views/admin/AdminPromosView.vue'),

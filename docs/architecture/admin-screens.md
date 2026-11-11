@@ -51,6 +51,29 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
   Tests: `adminPickup.spec.ts`, and `orders.spec.ts` ("what the store offers at checkout"); the fake Api's `api.checkoutOptions` models a
   store without pickup or transfer, and `api.admin.pickup` keeps the settings.
 
+- Cash orders in the admin (`AdminOrderView.vue`): a pending cash order can be moved through preparation and delivery before it is paid
+  (the Api's `nextFulfillment` says so), and "Cobré en efectivo" marks it paid. An order without an email shows "No dejó email" and its
+  phone, and the "each change emails the customer" note is hidden. Tests: `cashOrders.spec.ts`.
+
+- Share screen: `/admin/compartir` (`AdminShareView.vue`, "Compartir tienda" in the admin sidebar). The store's link (`window.location.origin`, so its own address, a custom domain once it has one) with a "Copiar link" button, and a printable poster: the store's name, "Escaneá y hacé tu pedido", a QR for the link and the link. The QR is drawn in the browser by the `qrcode` package (`QRCode.toString`, SVG, always dark on white so it scans whatever the theme); "Imprimir el cartel" calls `window.print()` and a print stylesheet in the view hides the admin chrome. Tests: `adminShare.spec.ts`.
+
+- Delivery zones screen: `/admin/zonas` (`AdminDeliveryZonesView.vue`, "Zonas de envío" in the admin sidebar, client in `src/api/admin.ts`). The areas the
+  store delivers to, each with a cost and a minimum order (0 = free / none); add, edit in place, remove after asking (a stronger warning for the
+  last one, since without zones the store goes back to a postal code and free shipping). The Api validates (name not repeated ignoring case,
+  amounts from 0) and its messages show next to the field. The checkout reads the zones from `GET /api/checkout-options`; the fake Api's
+  `api.admin.deliveryZones` keeps them in `api.checkoutOptions.zones`. The admin order page shows the zone, and drops the postal code when
+  there is none. Tests: `deliveryZones.spec.ts`.
+
+- Checkout settings screen: `/admin/cobros` (`AdminCheckoutSettingsView.vue`, "Cobros y WhatsApp" in the admin sidebar, client in
+  `src/api/admin.ts`). The WhatsApp number that receives orders (typed freely, the Api keeps the digits and refuses one that can't be
+  dialed) and two switches, cash and Mercado Pago. The form shows what the Api resolves for the store's kind when nothing was saved: a
+  grocery starts with cash only. Saving changes `GET /api/checkout-options` (`cash`, `mercadoPago`, `whatsappNumber`): the checkout
+  hides Mercado Pago when it is off, starts on the first method left, and with none left says so and disables "Confirmar pedido".
+  Cash is listed at checkout when it is on (see `storefront.md`). `GET /api/theme` carries `storeKind` ('Standard' | 'Grocery'), which the
+  checkout reads to ask a grocery's shoppers for a phone; the platform tenant list carries `kind`. Tests:
+  `adminCheckoutSettings.spec.ts` and `orders.spec.ts`; the fake Api's `api.admin.checkoutSettings` keeps the settings and updates
+  `api.checkoutOptions` as the real one would.
+
 - Promotions screen: `/admin/promociones` (`AdminPromosView.vue`, "Promociones" in the admin sidebar, client in `src/api/admin.ts`). The
   store's home carousel: add a slide (small text, title, button text, what the button opens: a category, a collection or the whole
   store, and an optional photo description), then upload its photo; a slide without a photo shows "No se muestra hasta que tenga foto"

@@ -28,6 +28,8 @@ export interface Theme {
   socialLinks: SocialLink[]
   // The store's contact phone as its owner typed it; null when none is set.
   phone: string | null
+  // 'Standard' (pay first) or 'Grocery' (lightweight neighborhood store: orders by WhatsApp, cash or transfer).
+  storeKind: 'Standard' | 'Grocery'
 }
 
 export function getTheme(): Promise<Theme> {

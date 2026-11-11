@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/http'
@@ -23,30 +23,59 @@ import { leaveTo } from '@/lib/navigation'
 import { rememberOrderToken } from '@/lib/orderAccess'
 import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
+import { useThemeStore } from '@/stores/theme'
 
 // Mercado Pago Checkout Pro covers cards too, so there's no separate card option (plan decisions).
 const PAYMENT_METHODS: { key: PaymentMethod; label: string; note: string }[] = [
   { key: 'mercadopago', label: 'Mercado Pago', note: 'Hasta 6 cuotas' },
+  { key: 'cash', label: 'Efectivo', note: 'Pagás al recibir o retirar' },
   { key: 'transfer', label: 'Transferencia', note: '10% off' },
 ]
 
 const router = useRouter()
 const cart = useCartStore()
+// A grocery asks for a phone and takes no email: its shoppers are neighbors the owner reaches by phone or WhatsApp.
+const theme = useThemeStore()
+const grocery = computed(() => theme.isGrocery)
 
 const delivery = ref<Delivery>('home')
 const payment = ref<PaymentMethod>('mercadopago')
 
-// What this store offers. Until it loads (or if it fails) only home delivery and Mercado Pago show, which every store has.
+// What this store offers. Until it loads (or if it fails) only home delivery and Mercado Pago show, which a standard
+// store always has.
 const options = ref<CheckoutOptions | null>(null)
 const pickup = computed(() => options.value?.pickup ?? null)
-const paymentMethods = computed(() =>
-  PAYMENT_METHODS.filter((m) => m.key !== 'transfer' || options.value?.transfer),
+const zones = computed(() => options.value?.zones ?? [])
+// The zone the shopper picked; only a home delivery to a store with zones has one.
+const zoneId = ref('')
+const zone = computed(() =>
+  delivery.value === 'home' ? (zones.value.find((z) => z.id === zoneId.value) ?? null) : null,
 )
+const paymentMethods = computed(() =>
+  PAYMENT_METHODS.filter((m) => {
+    if (m.key === 'transfer') return options.value?.transfer
+    if (m.key === 'cash') return options.value?.cash
+    return options.value?.mercadoPago ?? true
+  }),
+)
+// A store that turned Mercado Pago off must not start on it.
+watch(paymentMethods, (methods) => {
+  if (methods.length > 0 && !methods.some((m) => m.key === payment.value)) {
+    payment.value = methods[0]!.key
+  }
+})
 onMounted(async () => {
   try {
     options.value = await getCheckoutOptions()
   } catch {
-    options.value = { pickup: null, transfer: false }
+    options.value = {
+      zones: [],
+      pickup: null,
+      transfer: false,
+      cash: false,
+      mercadoPago: true,
+      whatsappNumber: null,
+    }
   }
 })
 const busy = ref(false)
@@ -59,6 +88,7 @@ const auth = useAuthStore()
 const form = reactive({
   name: auth.user?.name ?? '',
   email: auth.user?.email ?? '',
+  phone: '',
   address: '',
   zip: '',
 })
@@ -67,7 +97,9 @@ const formError = ref(false)
 const discount = computed(() =>
   payment.value === 'transfer' ? cart.subtotal * TRANSFER_DISCOUNT_RATE : 0,
 )
-const total = computed(() => cart.subtotal + SHIPPING_COST - discount.value)
+// The Api prices the order; this only previews it. A store with zones charges the picked zone's cost.
+const shipping = computed(() => (zones.value.length > 0 ? (zone.value?.cost ?? 0) : SHIPPING_COST))
+const total = computed(() => cart.subtotal + shipping.value - discount.value)
 
 function clearError() {
   formError.value = false
@@ -81,7 +113,9 @@ function refusal(error: unknown): string {
     const items = error.problem.items as { productSlug: string; size: string; stock: number }[]
     const names = items.map((i) => {
       const line = cart.lines.find((l) => l.slug === i.productSlug && l.size === i.size)
-      return `${line?.name ?? i.productSlug} (talle ${i.size})`
+      return grocery.value
+        ? (line?.name ?? i.productSlug)
+        : `${line?.name ?? i.productSlug} (talle ${i.size})`
     })
     return `No hay stock suficiente de ${names.join(', ')}. Revisá tu carrito.`
   }
@@ -90,9 +124,13 @@ function refusal(error: unknown): string {
 }
 
 async function placeOrder() {
-  if (busy.value) return
-  const missingAddress = delivery.value === 'home' && (!form.address.trim() || !form.zip.trim())
-  if (!form.name.trim() || !form.email.trim() || missingAddress) {
+  if (busy.value || paymentMethods.value.length === 0) return
+  const byZone = zones.value.length > 0
+  const missingAddress =
+    delivery.value === 'home' &&
+    (!form.address.trim() || (byZone ? !zoneId.value : !form.zip.trim()))
+  const missingContact = grocery.value ? !form.phone.trim() : !form.email.trim()
+  if (!form.name.trim() || missingContact || missingAddress) {
     formError.value = true
     return
   }
@@ -103,12 +141,14 @@ async function placeOrder() {
     const placed = await submitOrder(
       {
         email: form.email.trim(),
+        ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
         name: form.name.trim(),
         delivery: delivery.value,
         address:
           delivery.value === 'home'
-            ? { street: form.address.trim(), postalCode: form.zip.trim() }
+            ? { street: form.address.trim(), postalCode: byZone ? '' : form.zip.trim() }
             : null,
+        ...(delivery.value === 'home' && byZone ? { zoneId: zoneId.value } : {}),
         paymentMethod: payment.value,
       },
       idempotencyKey,
@@ -173,8 +213,19 @@ async function placeOrder() {
                 placeholder="Juan Pérez"
               />
             </div>
+            <div v-if="grocery" class="field">
+              <label for="co-phone">Teléfono</label>
+              <input
+                id="co-phone"
+                v-model="form.phone"
+                class="input"
+                type="tel"
+                autocomplete="tel"
+                placeholder="11 5555-1234"
+              />
+            </div>
             <div class="field">
-              <label for="co-email">Email</label>
+              <label for="co-email">{{ grocery ? 'Email (opcional)' : 'Email' }}</label>
               <input
                 id="co-email"
                 v-model="form.email"
@@ -196,7 +247,19 @@ async function placeOrder() {
                 placeholder="Av. Corrientes 1234"
               />
             </div>
-            <div class="field">
+            <div v-if="zones.length > 0" class="field">
+              <label for="co-zone">Zona de entrega</label>
+              <select id="co-zone" v-model="zoneId" class="input">
+                <option value="" disabled>Elegí tu zona</option>
+                <option v-for="z in zones" :key="z.id" :value="z.id">
+                  {{ z.name }} · {{ z.cost ? formatPrice(z.cost) : 'envío gratis' }}
+                </option>
+              </select>
+              <span v-if="zone && zone.minimumOrder" class="hint">
+                Pedido mínimo: {{ formatPrice(zone.minimumOrder) }}
+              </span>
+            </div>
+            <div v-else class="field">
               <label for="co-zip">Cód. postal</label>
               <input
                 id="co-zip"
@@ -227,6 +290,9 @@ async function placeOrder() {
             </span>
             <span class="pay-note">{{ m.note }}</span>
           </label>
+          <p v-if="paymentMethods.length === 0" class="pay-note">
+            Esta tienda todavía no tiene medios de pago para comprar online.
+          </p>
         </div>
       </form>
 
@@ -238,7 +304,9 @@ async function placeOrder() {
           </div>
           <div class="line-info">
             <span class="line-name">{{ l.name }}</span>
-            <span class="line-meta">Talle {{ l.size }} · x{{ l.qty }}</span>
+            <span class="line-meta"
+              ><template v-if="!grocery">Talle {{ l.size }} · </template>x{{ l.qty }}</span
+            >
           </div>
           <span class="line-total">{{ formatPrice(l.total) }}</span>
         </div>
@@ -249,7 +317,7 @@ async function placeOrder() {
           </div>
           <div class="row">
             <span class="muted">Envío</span>
-            <span>{{ SHIPPING_COST ? formatPrice(SHIPPING_COST) : 'Gratis' }}</span>
+            <span>{{ shipping ? formatPrice(shipping) : 'Gratis' }}</span>
           </div>
           <div v-if="discount > 0" class="row">
             <span class="muted">Transferencia −10%</span>
@@ -261,7 +329,12 @@ async function placeOrder() {
         </div>
         <span v-if="formError" class="form-error">Completá tus datos para confirmar.</span>
         <span v-if="orderError" class="form-error" role="alert">{{ orderError }}</span>
-        <button type="button" class="btn btn-primary confirm" :disabled="busy" @click="placeOrder">
+        <button
+          type="button"
+          class="btn btn-primary confirm"
+          :disabled="busy || paymentMethods.length === 0"
+          @click="placeOrder"
+        >
           {{ busy ? 'Confirmando…' : 'Confirmar pedido' }}
         </button>
       </aside>
@@ -361,6 +434,11 @@ async function placeOrder() {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--color-neutral-500);
 }
 
 .pay-note {
