@@ -45,6 +45,12 @@ const payment = ref<PaymentMethod>('mercadopago')
 // store always has.
 const options = ref<CheckoutOptions | null>(null)
 const pickup = computed(() => options.value?.pickup ?? null)
+const zones = computed(() => options.value?.zones ?? [])
+// The zone the shopper picked; only a home delivery to a store with zones has one.
+const zoneId = ref('')
+const zone = computed(() =>
+  delivery.value === 'home' ? (zones.value.find((z) => z.id === zoneId.value) ?? null) : null,
+)
 const paymentMethods = computed(() =>
   PAYMENT_METHODS.filter((m) => {
     if (m.key === 'transfer') return options.value?.transfer
@@ -63,6 +69,7 @@ onMounted(async () => {
     options.value = await getCheckoutOptions()
   } catch {
     options.value = {
+      zones: [],
       pickup: null,
       transfer: false,
       cash: false,
@@ -90,7 +97,9 @@ const formError = ref(false)
 const discount = computed(() =>
   payment.value === 'transfer' ? cart.subtotal * TRANSFER_DISCOUNT_RATE : 0,
 )
-const total = computed(() => cart.subtotal + SHIPPING_COST - discount.value)
+// The Api prices the order; this only previews it. A store with zones charges the picked zone's cost.
+const shipping = computed(() => (zones.value.length > 0 ? (zone.value?.cost ?? 0) : SHIPPING_COST))
+const total = computed(() => cart.subtotal + shipping.value - discount.value)
 
 function clearError() {
   formError.value = false
@@ -114,7 +123,10 @@ function refusal(error: unknown): string {
 
 async function placeOrder() {
   if (busy.value || paymentMethods.value.length === 0) return
-  const missingAddress = delivery.value === 'home' && (!form.address.trim() || !form.zip.trim())
+  const byZone = zones.value.length > 0
+  const missingAddress =
+    delivery.value === 'home' &&
+    (!form.address.trim() || (byZone ? !zoneId.value : !form.zip.trim()))
   const missingContact = grocery.value ? !form.phone.trim() : !form.email.trim()
   if (!form.name.trim() || missingContact || missingAddress) {
     formError.value = true
@@ -132,8 +144,9 @@ async function placeOrder() {
         delivery: delivery.value,
         address:
           delivery.value === 'home'
-            ? { street: form.address.trim(), postalCode: form.zip.trim() }
+            ? { street: form.address.trim(), postalCode: byZone ? '' : form.zip.trim() }
             : null,
+        ...(delivery.value === 'home' && byZone ? { zoneId: zoneId.value } : {}),
         paymentMethod: payment.value,
       },
       idempotencyKey,
@@ -232,7 +245,19 @@ async function placeOrder() {
                 placeholder="Av. Corrientes 1234"
               />
             </div>
-            <div class="field">
+            <div v-if="zones.length > 0" class="field">
+              <label for="co-zone">Zona de entrega</label>
+              <select id="co-zone" v-model="zoneId" class="input">
+                <option value="" disabled>Elegí tu zona</option>
+                <option v-for="z in zones" :key="z.id" :value="z.id">
+                  {{ z.name }} · {{ z.cost ? formatPrice(z.cost) : 'envío gratis' }}
+                </option>
+              </select>
+              <span v-if="zone && zone.minimumOrder" class="hint">
+                Pedido mínimo: {{ formatPrice(zone.minimumOrder) }}
+              </span>
+            </div>
+            <div v-else class="field">
               <label for="co-zip">Cód. postal</label>
               <input
                 id="co-zip"
@@ -288,7 +313,7 @@ async function placeOrder() {
           </div>
           <div class="row">
             <span class="muted">Envío</span>
-            <span>{{ SHIPPING_COST ? formatPrice(SHIPPING_COST) : 'Gratis' }}</span>
+            <span>{{ shipping ? formatPrice(shipping) : 'Gratis' }}</span>
           </div>
           <div v-if="discount > 0" class="row">
             <span class="muted">Transferencia −10%</span>
@@ -405,6 +430,11 @@ async function placeOrder() {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--color-neutral-500);
 }
 
 .pay-note {

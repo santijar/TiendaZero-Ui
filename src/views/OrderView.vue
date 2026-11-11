@@ -349,7 +349,11 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <span v-if="order.shippingAddress" class="ship-to">
-          Envío a {{ order.shippingAddress.street }} ({{ order.shippingAddress.postalCode }})
+          Envío a {{ order.shippingAddress.street
+          }}<template v-if="order.deliveryZone"> ({{ order.deliveryZone }})</template
+          ><template v-else-if="order.shippingAddress.postalCode">
+            ({{ order.shippingAddress.postalCode }})</template
+          >
         </span>
       </aside>
     </template>

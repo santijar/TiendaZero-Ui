@@ -176,7 +176,16 @@ onMounted(load)
             </div>
             <div v-if="order.shippingAddress">
               <dt>Dirección</dt>
-              <dd>{{ order.shippingAddress.street }} ({{ order.shippingAddress.postalCode }})</dd>
+              <dd>
+                {{ order.shippingAddress.street }}
+                <template v-if="order.shippingAddress.postalCode">
+                  ({{ order.shippingAddress.postalCode }})</template
+                >
+              </dd>
+            </div>
+            <div v-if="order.deliveryZone">
+              <dt>Zona</dt>
+              <dd>{{ order.deliveryZone }}</dd>
             </div>
             <div v-if="order.status === 'paid' || order.paymentMethod === 'cash'">
               <dt>Estado</dt>

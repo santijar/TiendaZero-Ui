@@ -137,6 +137,11 @@ export function createAppRouter(
             component: () => import('@/views/admin/AdminPickupView.vue'),
           },
           {
+            path: 'zonas',
+            name: 'admin-delivery-zones',
+            component: () => import('@/views/admin/AdminDeliveryZonesView.vue'),
+          },
+          {
             path: 'cobros',
             name: 'admin-checkout-settings',
             component: () => import('@/views/admin/AdminCheckoutSettingsView.vue'),

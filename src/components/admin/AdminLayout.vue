@@ -15,6 +15,7 @@ const LINKS = [
   { to: { name: 'admin-promos' }, label: 'Promociones' },
   { to: { name: 'admin-payments' }, label: 'Pagos' },
   { to: { name: 'admin-pickup' }, label: 'Retiro' },
+  { to: { name: 'admin-delivery-zones' }, label: 'Zonas de envío' },
   { to: { name: 'admin-checkout-settings' }, label: 'Cobros y WhatsApp' },
   { to: { name: 'admin-domains' }, label: 'Dominios' },
 ]

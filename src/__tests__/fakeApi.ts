@@ -12,6 +12,7 @@ import type {
   PickupSettings,
   SavePickupSettings,
   CheckoutSettings,
+  SaveDeliveryZone,
   SaveTransferAccount,
   TransferAccount,
   SaveProduct,
@@ -306,6 +307,25 @@ function createOrderServer(
         const transfer = body.paymentMethod === 'transfer'
         const cash = body.paymentMethod === 'cash'
         const discount = transfer ? subtotal * 0.1 : 0
+        // A store with zones delivers by zone: the one named sets the shipping cost and a minimum order.
+        const zone =
+          body.delivery === 'home' && checkoutOptions.zones.length > 0
+            ? checkoutOptions.zones.find((z) => z.id === body.zoneId)
+            : undefined
+        if (body.delivery === 'home' && checkoutOptions.zones.length > 0 && !zone) {
+          return json({ errors: { zoneId: ['Elegí tu zona de entrega.'] } }, 400)
+        }
+        if (zone && subtotal < zone.minimumOrder) {
+          return json(
+            {
+              errors: {
+                zoneId: [`El pedido mínimo para ${zone.name} es $ ${zone.minimumOrder}.`],
+              },
+            },
+            400,
+          )
+        }
+        const shippingCost = zone?.cost ?? 0
         const number = `RG-${20001 + orders.size}`
         const order = {
           number,
@@ -331,9 +351,10 @@ function createOrderServer(
             lineTotal: i.lineTotal,
           })),
           subtotal,
-          shippingCost: 0,
+          shippingCost,
           discount,
-          total: subtotal - discount,
+          total: subtotal + shippingCost - discount,
+          deliveryZone: zone?.name ?? null,
           createdAt: '2026-11-02T15:00:00Z',
           expiresAt: transfer
             ? '2026-11-04T15:00:00Z'
@@ -439,6 +460,7 @@ function createAdminServer(
     transfer: createTransferAdmin(),
     pickup: createPickupAdmin(),
     checkoutSettings: createCheckoutSettingsAdmin(checkoutOptions),
+    deliveryZones: createDeliveryZonesAdmin(checkoutOptions),
     promos: createPromoAdmin(),
     domains: createDomainAdmin(),
     handle(method: string, path: string, body: Record<string, unknown>) {
@@ -773,6 +795,58 @@ function createCheckoutSettingsAdmin(checkoutOptions: CheckoutOptions) {
       }
       Object.assign(checkoutOptions, state.settings)
       return json(state.settings)
+    },
+  }
+}
+
+// The delivery zones screen (/api/admin/delivery-zones): same rules as the real one (a name that is not repeated, amounts
+// from 0), and the zones it holds are what the shopper's checkout offers (checkoutOptions.zones).
+function createDeliveryZonesAdmin(checkoutOptions: CheckoutOptions) {
+  const state = { saves: [] as SaveDeliveryZone[], deletes: [] as string[], next: 1 }
+
+  function check(body: SaveDeliveryZone, id?: string) {
+    const errors: Record<string, string[]> = {}
+    if (!body.name) errors.name = ['Ingresá el nombre de la zona (hasta 80 caracteres).']
+    else if (
+      checkoutOptions.zones.some(
+        (z) => z.id !== id && z.name.toLowerCase() === body.name.toLowerCase(),
+      )
+    ) {
+      errors.name = ['Ya tenés una zona con ese nombre.']
+    }
+    if (body.cost === null || body.cost < 0) {
+      errors.cost = ['Ingresá cuánto cuesta el envío (0 si es gratis).']
+    }
+    if (body.minimumOrder === null || body.minimumOrder < 0) {
+      errors.minimumOrder = ['Ingresá el pedido mínimo (0 si no hay).']
+    }
+    return Object.keys(errors).length > 0 ? json({ errors }, 400) : null
+  }
+
+  return {
+    state,
+    handle(method: string, path: string, body: Record<string, unknown>) {
+      const id = path.split('/')[4]
+      if (method === 'GET') return json(checkoutOptions.zones)
+      if (method === 'DELETE') {
+        state.deletes.push(id!)
+        checkoutOptions.zones = checkoutOptions.zones.filter((z) => z.id !== id)
+        return new Response(null, { status: 204 })
+      }
+      const request = body as unknown as SaveDeliveryZone
+      const refused = check(request, id)
+      if (refused) return refused
+      state.saves.push(request)
+      const zone = {
+        id: id ?? `zone-${state.next++}`,
+        name: request.name,
+        cost: request.cost!,
+        minimumOrder: request.minimumOrder!,
+      }
+      checkoutOptions.zones = id
+        ? checkoutOptions.zones.map((z) => (z.id === id ? zone : z))
+        : [...checkoutOptions.zones, zone]
+      return json(zone, method === 'POST' ? 201 : 200)
     },
   }
 }
@@ -1186,6 +1260,7 @@ export function stubApi() {
     cash: false,
     mercadoPago: true,
     whatsappNumber: null,
+    zones: [],
   }
   const orderServer = createOrderServer(cartServer, checkoutOptions)
   const adminServer = createAdminServer(orderServer, checkoutOptions)
@@ -1249,6 +1324,9 @@ export function stubApi() {
       }
       if (url.pathname === '/api/admin/transfer-account') {
         return adminServer.transfer.handle(method, body)
+      }
+      if (url.pathname.startsWith('/api/admin/delivery-zones')) {
+        return adminServer.deliveryZones.handle(method, url.pathname, body)
       }
       if (url.pathname === '/api/admin/checkout-settings') {
         return adminServer.checkoutSettings.handle(method, body)

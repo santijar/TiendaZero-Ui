@@ -55,6 +55,13 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
   (the Api's `nextFulfillment` says so), and "Cobré en efectivo" marks it paid. An order without an email shows "No dejó email" and its
   phone, and the "each change emails the customer" note is hidden. Tests: `cashOrders.spec.ts`.
 
+- Delivery zones screen: `/admin/zonas` (`AdminDeliveryZonesView.vue`, "Zonas de envío" in the admin sidebar, client in `src/api/admin.ts`). The areas the
+  store delivers to, each with a cost and a minimum order (0 = free / none); add, edit in place, remove after asking (a stronger warning for the
+  last one, since without zones the store goes back to a postal code and free shipping). The Api validates (name not repeated ignoring case,
+  amounts from 0) and its messages show next to the field. The checkout reads the zones from `GET /api/checkout-options`; the fake Api's
+  `api.admin.deliveryZones` keeps them in `api.checkoutOptions.zones`. The admin order page shows the zone, and drops the postal code when
+  there is none. Tests: `deliveryZones.spec.ts`.
+
 - Checkout settings screen: `/admin/cobros` (`AdminCheckoutSettingsView.vue`, "Cobros y WhatsApp" in the admin sidebar, client in
   `src/api/admin.ts`). The WhatsApp number that receives orders (typed freely, the Api keeps the digits and refuses one that can't be
   dialed) and two switches, cash and Mercado Pago. The form shows what the Api resolves for the store's kind when nothing was saved: a

@@ -56,6 +56,8 @@ export interface Order {
   trackingInfo: string | null
   // Where to collect a pickup order; null for home delivery, or if the store has since removed it.
   pickup: PickupInfo | null
+  // The zone a home delivery went to; null when the store had none or the order is a pickup.
+  deliveryZone: string | null
 }
 
 // A store's pickup point: a name and free text for hours and lead time, both written by the store.
@@ -64,9 +66,19 @@ export interface PickupInfo {
   details: string
 }
 
+export interface DeliveryZone {
+  id: string
+  name: string
+  cost: number
+  // The smallest items total the store delivers to this zone; 0 when there is none.
+  minimumOrder: number
+}
+
 // What this store's checkout offers (GET /api/checkout-options): pickup, if it has set one up, whether it takes bank
 // transfers, cash and Mercado Pago, and the WhatsApp number (digits with country code) that receives its orders.
 export interface CheckoutOptions {
+  // Where the store delivers, with the price of each. Empty: home delivery is free and asks for a postal code.
+  zones: DeliveryZone[]
   pickup: PickupInfo | null
   transfer: boolean
   cash: boolean
@@ -96,6 +108,8 @@ export interface PlaceOrderRequest {
   // A grocery takes no email (send an empty one) but needs a phone; every other store needs an email.
   email: string
   phone?: string
+  // Required for a home delivery when the store has zones (then no postal code is needed).
+  zoneId?: string
   name: string
   delivery: Delivery
   address: ShippingAddress | null
