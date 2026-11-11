@@ -11,6 +11,7 @@ import type {
   PaymentAccount,
   PickupSettings,
   SavePickupSettings,
+  CheckoutSettings,
   SaveTransferAccount,
   TransferAccount,
   SaveProduct,
@@ -372,7 +373,10 @@ function createOrderServer(
 
 // A minimal /api/admin: orders (sharing the order server's orders) and an editable product whose
 // stock version tests can bump, as a sale would.
-function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
+function createAdminServer(
+  orderServer: ReturnType<typeof createOrderServer>,
+  checkoutOptions: CheckoutOptions,
+) {
   const product: AdminProduct = {
     id: 1,
     slug: 'cam-titular',
@@ -421,6 +425,7 @@ function createAdminServer(orderServer: ReturnType<typeof createOrderServer>) {
     payments: createPaymentAdmin(),
     transfer: createTransferAdmin(),
     pickup: createPickupAdmin(),
+    checkoutSettings: createCheckoutSettingsAdmin(checkoutOptions),
     promos: createPromoAdmin(),
     domains: createDomainAdmin(),
     handle(method: string, path: string, body: Record<string, unknown>) {
@@ -659,6 +664,7 @@ export const PLATFORM_TENANTS = [
     status: 'Active',
     orderNumberPrefix: 'RG',
     primaryDomain: 'regate.localhost',
+    kind: 'Standard',
   },
   {
     id: '02',
@@ -667,6 +673,7 @@ export const PLATFORM_TENANTS = [
     status: 'Active',
     orderNumberPrefix: 'IND',
     primaryDomain: 'indians.localhost',
+    kind: 'Standard',
   },
 ]
 
@@ -713,6 +720,45 @@ function createPickupAdmin() {
       }
       state.saves.push(request)
       state.settings = { configured: true, name: request.name, details: request.details ?? '' }
+      return json(state.settings)
+    },
+  }
+}
+
+// The checkout settings of the Cobros y WhatsApp screen (/api/admin/checkout-settings): the number is normalized to digits
+// and refused when it can't be dialed, like the real one. Saving also changes what the shopper's checkout offers.
+function createCheckoutSettingsAdmin(checkoutOptions: CheckoutOptions) {
+  const state = {
+    settings: { whatsappNumber: null, cash: false, mercadoPago: true } as CheckoutSettings,
+    saves: [] as CheckoutSettings[],
+  }
+
+  return {
+    state,
+    handle(method: string, body: Record<string, unknown>) {
+      if (method === 'GET') return json(state.settings)
+      if (method !== 'PUT') return json({}, 405)
+      const request = body as unknown as CheckoutSettings
+      const digits = (request.whatsappNumber ?? '').replace(/\D/g, '')
+      if (digits.length > 0 && (digits.length < 8 || digits.length > 15)) {
+        return json(
+          {
+            errors: {
+              whatsappNumber: [
+                'Ingresá el número con código de país, por ejemplo +54 9 11 5555-1234.',
+              ],
+            },
+          },
+          400,
+        )
+      }
+      state.saves.push(request)
+      state.settings = {
+        whatsappNumber: digits || null,
+        cash: request.cash,
+        mercadoPago: request.mercadoPago,
+      }
+      Object.assign(checkoutOptions, state.settings)
       return json(state.settings)
     },
   }
@@ -1124,9 +1170,12 @@ export function stubApi() {
   const checkoutOptions: CheckoutOptions = {
     pickup: { name: 'Showroom Regate', details: 'Lun a vie · 10 a 19 h · Listo en 48 h' },
     transfer: true,
+    cash: false,
+    mercadoPago: true,
+    whatsappNumber: null,
   }
   const orderServer = createOrderServer(cartServer, checkoutOptions)
-  const adminServer = createAdminServer(orderServer)
+  const adminServer = createAdminServer(orderServer, checkoutOptions)
   const platformServer = createPlatformServer()
   // The theme of the store the fake "host" belongs to: Regate unless a test swaps it.
   const theme: { current: Theme } = { current: REGATE_THEME }
@@ -1187,6 +1236,9 @@ export function stubApi() {
       }
       if (url.pathname === '/api/admin/transfer-account') {
         return adminServer.transfer.handle(method, body)
+      }
+      if (url.pathname === '/api/admin/checkout-settings') {
+        return adminServer.checkoutSettings.handle(method, body)
       }
       if (url.pathname === '/api/admin/pickup') {
         return adminServer.pickup.handle(method, body)
@@ -1259,6 +1311,7 @@ export const REGATE_THEME: Theme = {
     { label: '@regate.indumentaria', url: 'https://www.instagram.com/regate.indumentaria/' },
   ],
   phone: null,
+  storeKind: 'Standard',
 }
 
 export const INDIANS_THEME: Theme = {
@@ -1279,4 +1332,5 @@ export const INDIANS_THEME: Theme = {
   faviconUrl: '/media/brand/indians-favicon.png',
   socialLinks: [{ label: '@indians', url: 'https://www.instagram.com/' }],
   phone: null,
+  storeKind: 'Standard',
 }

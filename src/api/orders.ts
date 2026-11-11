@@ -62,11 +62,14 @@ export interface PickupInfo {
   details: string
 }
 
-// What this store's checkout offers (GET /api/checkout-options): pickup, if it has set one up, and whether it takes bank
-// transfers. Mercado Pago is always listed.
+// What this store's checkout offers (GET /api/checkout-options): pickup, if it has set one up, whether it takes bank
+// transfers, cash and Mercado Pago, and the WhatsApp number (digits with country code) that receives its orders.
 export interface CheckoutOptions {
   pickup: PickupInfo | null
   transfer: boolean
+  cash: boolean
+  mercadoPago: boolean
+  whatsappNumber: string | null
 }
 
 export function getCheckoutOptions(): Promise<CheckoutOptions> {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/http'
@@ -36,17 +36,32 @@ const cart = useCartStore()
 const delivery = ref<Delivery>('home')
 const payment = ref<PaymentMethod>('mercadopago')
 
-// What this store offers. Until it loads (or if it fails) only home delivery and Mercado Pago show, which every store has.
+// What this store offers. Until it loads (or if it fails) only home delivery and Mercado Pago show, which a standard
+// store always has. Cash is not listed yet: the Api cannot place a cash order until that path exists.
 const options = ref<CheckoutOptions | null>(null)
 const pickup = computed(() => options.value?.pickup ?? null)
 const paymentMethods = computed(() =>
-  PAYMENT_METHODS.filter((m) => m.key !== 'transfer' || options.value?.transfer),
+  PAYMENT_METHODS.filter((m) =>
+    m.key === 'transfer' ? options.value?.transfer : (options.value?.mercadoPago ?? true),
+  ),
 )
+// A store that turned Mercado Pago off must not start on it.
+watch(paymentMethods, (methods) => {
+  if (methods.length > 0 && !methods.some((m) => m.key === payment.value)) {
+    payment.value = methods[0]!.key
+  }
+})
 onMounted(async () => {
   try {
     options.value = await getCheckoutOptions()
   } catch {
-    options.value = { pickup: null, transfer: false }
+    options.value = {
+      pickup: null,
+      transfer: false,
+      cash: false,
+      mercadoPago: true,
+      whatsappNumber: null,
+    }
   }
 })
 const busy = ref(false)
@@ -90,7 +105,7 @@ function refusal(error: unknown): string {
 }
 
 async function placeOrder() {
-  if (busy.value) return
+  if (busy.value || paymentMethods.value.length === 0) return
   const missingAddress = delivery.value === 'home' && (!form.address.trim() || !form.zip.trim())
   if (!form.name.trim() || !form.email.trim() || missingAddress) {
     formError.value = true
@@ -227,6 +242,9 @@ async function placeOrder() {
             </span>
             <span class="pay-note">{{ m.note }}</span>
           </label>
+          <p v-if="paymentMethods.length === 0" class="pay-note">
+            Esta tienda todavía no tiene medios de pago para comprar online.
+          </p>
         </div>
       </form>
 
@@ -261,7 +279,12 @@ async function placeOrder() {
         </div>
         <span v-if="formError" class="form-error">Completá tus datos para confirmar.</span>
         <span v-if="orderError" class="form-error" role="alert">{{ orderError }}</span>
-        <button type="button" class="btn btn-primary confirm" :disabled="busy" @click="placeOrder">
+        <button
+          type="button"
+          class="btn btn-primary confirm"
+          :disabled="busy || paymentMethods.length === 0"
+          @click="placeOrder"
+        >
           {{ busy ? 'Confirmando…' : 'Confirmar pedido' }}
         </button>
       </aside>

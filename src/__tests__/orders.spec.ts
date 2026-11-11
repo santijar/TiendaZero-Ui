@@ -137,6 +137,25 @@ describe('checkout and orders', () => {
       expect(wrapper.find('input[name="pay"][value="mercadopago"]').exists()).toBe(true)
     })
 
+    it('hides Mercado Pago, and starts on the next method, when the store turned it off', async () => {
+      api.checkoutOptions.mercadoPago = false
+      const wrapper = await checkoutWithCart()
+
+      expect(wrapper.find('input[name="pay"][value="mercadopago"]').exists()).toBe(false)
+      expect(
+        wrapper.find<HTMLInputElement>('input[name="pay"][value="transfer"]').element.checked,
+      ).toBe(true)
+    })
+
+    it('says so, and will not confirm, when the store has no payment method for online orders', async () => {
+      api.checkoutOptions.mercadoPago = false
+      api.checkoutOptions.transfer = false
+      const wrapper = await checkoutWithCart()
+
+      expect(wrapper.text()).toContain('no tiene medios de pago')
+      expect(wrapper.find('button.confirm').attributes('disabled')).toBeDefined()
+    })
+
     it('offers both when the store has set them up', async () => {
       const wrapper = await checkoutWithCart()
 

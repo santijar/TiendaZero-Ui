@@ -137,6 +137,11 @@ export function createAppRouter(
             component: () => import('@/views/admin/AdminPickupView.vue'),
           },
           {
+            path: 'cobros',
+            name: 'admin-checkout-settings',
+            component: () => import('@/views/admin/AdminCheckoutSettingsView.vue'),
+          },
+          {
             path: 'promociones',
             name: 'admin-promos',
             component: () => import('@/views/admin/AdminPromosView.vue'),

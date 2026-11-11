@@ -364,6 +364,19 @@ export const savePickupSettings = (body: SavePickupSettings) =>
   request<PickupSettings>('PUT', '/api/admin/pickup', { body })
 export const removePickupSettings = () => request<PickupSettings>('DELETE', '/api/admin/pickup')
 
+// How the store takes orders (AdminCheckoutSettingsEndpoints in the Api): the WhatsApp number that receives them and
+// whether it accepts cash and Mercado Pago. Without a saved row the Api answers the defaults of the store's kind.
+export interface CheckoutSettings {
+  whatsappNumber: string | null
+  cash: boolean
+  mercadoPago: boolean
+}
+
+export const getCheckoutSettings = () =>
+  request<CheckoutSettings>('GET', '/api/admin/checkout-settings')
+export const saveCheckoutSettings = (body: CheckoutSettings) =>
+  request<CheckoutSettings>('PUT', '/api/admin/checkout-settings', { body })
+
 export const getTransferAccount = () =>
   request<TransferAccount>('GET', '/api/admin/transfer-account')
 export const saveTransferAccount = (body: SaveTransferAccount) =>
