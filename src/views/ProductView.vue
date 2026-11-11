@@ -32,6 +32,14 @@ const hideSizes = computed(
   () => theme.isGrocery && product.value?.sizes.length === 1 && product.value.sizes[0]!.inStock,
 )
 
+// True when nothing can be bought: every size (or presentation) is out of stock.
+const soldOut = computed(
+  () =>
+    !!product.value &&
+    product.value.sizes.length > 0 &&
+    product.value.sizes.every((s) => !s.inStock),
+)
+
 // Main photo plus two detail shots; missing photos fall back to the empty image slot.
 const gallery = computed(() => {
   const images = product.value?.images ?? []
@@ -42,6 +50,12 @@ const gallery = computed(() => {
     { image: images[2], alt: `${name}, espalda`, placeholder: 'Espalda' },
   ]
 })
+
+// "Detalle" and "Espalda" are a clothes store's photos; a grocery shows its main photo (or its empty slot) and any
+// other photo it actually has.
+const shots = computed(() =>
+  theme.isGrocery ? gallery.value.filter((g, i) => i === 0 || g.image) : gallery.value,
+)
 
 let inflight: AbortController | undefined
 
@@ -97,7 +111,7 @@ function addToCart() {
 
     <div class="layout">
       <div class="gallery">
-        <div v-for="(g, i) in gallery" :key="g.placeholder" class="shot" :class="{ main: i === 0 }">
+        <div v-for="(g, i) in shots" :key="g.placeholder" class="shot" :class="{ main: i === 0 }">
           <ProductImage
             :src="g.image?.url ?? null"
             :alt="g.image?.alt ?? g.alt"
@@ -150,8 +164,8 @@ function addToCart() {
           Vista previa de solo lectura: no se puede comprar.
         </p>
         <div v-else class="actions">
-          <button type="button" class="btn btn-primary add" @click="addToCart">
-            <AppIcon name="bag" :size="18" />Agregar al carrito
+          <button type="button" class="btn btn-primary add" :disabled="soldOut" @click="addToCart">
+            <AppIcon name="bag" :size="18" />{{ soldOut ? 'Sin stock' : 'Agregar al carrito' }}
           </button>
           <button
             type="button"

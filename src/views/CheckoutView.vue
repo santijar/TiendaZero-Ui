@@ -316,7 +316,8 @@ async function placeOrder() {
           </div>
           <div class="row">
             <span class="muted">Envío</span>
-            <span>{{ shipping ? formatPrice(shipping) : 'Gratis' }}</span>
+            <span v-if="delivery === 'home' && zones.length > 0 && !zone">Elegí tu zona</span>
+            <span v-else>{{ shipping ? formatPrice(shipping) : 'Gratis' }}</span>
           </div>
           <div v-if="discount > 0" class="row">
             <span class="muted">Transferencia −10%</span>

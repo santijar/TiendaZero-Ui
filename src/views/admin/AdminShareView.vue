@@ -166,7 +166,11 @@ async function copy() {
     color: #000 !important;
   }
 
-  body {
+  html,
+  body,
+  #app,
+  .admin-shell,
+  .admin-main {
     background: #fff !important;
   }
 }

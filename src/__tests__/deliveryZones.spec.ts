@@ -197,7 +197,9 @@ describe('delivery zones', () => {
     it("adds the picked zone's cost to the total, and shows its minimum", async () => {
       api.checkoutOptions.zones = [centro, { ...norte, minimumOrder: 3000 }]
       const { wrapper, cart } = await checkoutWithCart()
-      expect(wrapper.find('.totals').text()).toContain('Gratis')
+      // No shipping price to show until a zone is picked.
+      expect(wrapper.find('.totals').text()).toContain('Elegí tu zona')
+      expect(wrapper.find('.totals').text()).not.toContain('Gratis')
 
       await wrapper.find('#co-zone').setValue('z-norte')
 

@@ -119,6 +119,30 @@ describe('WhatsApp and repeat order', () => {
       expect(message(later)).toContain('Envío a Calle 1 (Centro)')
     })
 
+    it("names a grocery product's brand, and leaves out the size that only says Unidad", async () => {
+      api.checkoutOptions.whatsappNumber = '5491155551234'
+      api.theme.current = { ...REGATE_THEME, storeKind: 'Grocery' }
+      Object.assign(api.checkoutOptions, { cash: true, mercadoPago: false, transfer: false })
+      PRODUCTS[1]!.brand = 'La Independencia'
+      try {
+        await mountAt('/')
+        await useCartStore().add(PRODUCTS[1]!, 'Único')
+        const checkout = await mountAt('/checkout')
+        await checkout.find('#co-name').setValue('Ana')
+        await checkout.find('#co-phone').setValue('11 5555-1234')
+        await checkout.find('input[name="del"][value="pickup"]').setValue()
+        await checkout.find('.confirm').trigger('click')
+        await flushPromises()
+
+        const text = message(checkout)
+
+        expect(text).toContain('• 1 × Bolso Deportivo · La Independencia')
+        expect(text).not.toContain('Único')
+      } finally {
+        PRODUCTS[1]!.brand = null
+      }
+    })
+
     it('never puts the order access token in the message', async () => {
       api.checkoutOptions.whatsappNumber = '5491155551234'
 

@@ -34,7 +34,7 @@ const order = ref<Order | null>(null)
 const whatsappNumber = ref<string | null>(null)
 const whatsappUrl = computed(() =>
   order.value && whatsappNumber.value && order.value.status !== 'expired'
-    ? orderWhatsappUrl(whatsappNumber.value, order.value)
+    ? orderWhatsappUrl(whatsappNumber.value, order.value, { grocery: theme.isGrocery })
     : null,
 )
 const state = ref<'loading' | 'ready' | 'not-found' | 'error'>('loading')
