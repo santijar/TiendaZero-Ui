@@ -55,6 +55,8 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
   (the Api's `nextFulfillment` says so), and "Cobré en efectivo" marks it paid. An order without an email shows "No dejó email" and its
   phone, and the "each change emails the customer" note is hidden. Tests: `cashOrders.spec.ts`.
 
+- Share screen: `/admin/compartir` (`AdminShareView.vue`, "Compartir tienda" in the admin sidebar). The store's link (`window.location.origin`, so its own address, a custom domain once it has one) with a "Copiar link" button, and a printable poster: the store's name, "Escaneá y hacé tu pedido", a QR for the link and the link. The QR is drawn in the browser by the `qrcode` package (`QRCode.toString`, SVG, always dark on white so it scans whatever the theme); "Imprimir el cartel" calls `window.print()` and a print stylesheet in the view hides the admin chrome. Tests: `adminShare.spec.ts`.
+
 - Delivery zones screen: `/admin/zonas` (`AdminDeliveryZonesView.vue`, "Zonas de envío" in the admin sidebar, client in `src/api/admin.ts`). The areas the
   store delivers to, each with a cost and a minimum order (0 = free / none); add, edit in place, remove after asking (a stronger warning for the
   last one, since without zones the store goes back to a postal code and free shipping). The Api validates (name not repeated ignoring case,
