@@ -66,14 +66,26 @@ describe('a product brand', () => {
   })
 
   describe('on the storefront', () => {
-    it('shows on the card above the name, only for a product that has one', async () => {
+    it('shows on the card in the line under the name, only for a product that has one', async () => {
       PRODUCTS[0]!.brand = BRAND
 
       const home = await mountAt('/')
 
       const cards = home.findAll('.card-item')
-      expect(cards[0]!.find('.brand').text()).toBe(BRAND)
-      expect(cards[1]!.find('.brand').exists()).toBe(false)
+      expect(cards[0]!.find('.meta').text()).toBe(`${BRAND} · Camisetas · Negro`)
+      expect(cards[1]!.find('.meta').text()).toBe('Accesorios · Negro')
+    })
+
+    it('keeps every card laid out the same, so the names of a row line up', async () => {
+      PRODUCTS[0]!.brand = BRAND
+
+      const home = await mountAt('/')
+
+      // The brand adds no element of its own: each card is image, name, one line of detail, price.
+      for (const card of home.findAll('.card-item')) {
+        expect(card.find('.details').element.children).toHaveLength(3)
+        expect(card.find('.brand').exists()).toBe(false)
+      }
     })
 
     it("shows on the product page, and not when the store didn't say", async () => {
