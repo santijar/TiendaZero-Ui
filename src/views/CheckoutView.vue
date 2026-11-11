@@ -23,27 +23,34 @@ import { leaveTo } from '@/lib/navigation'
 import { rememberOrderToken } from '@/lib/orderAccess'
 import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
+import { useThemeStore } from '@/stores/theme'
 
 // Mercado Pago Checkout Pro covers cards too, so there's no separate card option (plan decisions).
 const PAYMENT_METHODS: { key: PaymentMethod; label: string; note: string }[] = [
   { key: 'mercadopago', label: 'Mercado Pago', note: 'Hasta 6 cuotas' },
+  { key: 'cash', label: 'Efectivo', note: 'Pagás al recibir o retirar' },
   { key: 'transfer', label: 'Transferencia', note: '10% off' },
 ]
 
 const router = useRouter()
 const cart = useCartStore()
+// A grocery asks for a phone and takes no email: its shoppers are neighbors the owner reaches by phone or WhatsApp.
+const theme = useThemeStore()
+const grocery = computed(() => theme.theme?.storeKind === 'Grocery')
 
 const delivery = ref<Delivery>('home')
 const payment = ref<PaymentMethod>('mercadopago')
 
 // What this store offers. Until it loads (or if it fails) only home delivery and Mercado Pago show, which a standard
-// store always has. Cash is not listed yet: the Api cannot place a cash order until that path exists.
+// store always has.
 const options = ref<CheckoutOptions | null>(null)
 const pickup = computed(() => options.value?.pickup ?? null)
 const paymentMethods = computed(() =>
-  PAYMENT_METHODS.filter((m) =>
-    m.key === 'transfer' ? options.value?.transfer : (options.value?.mercadoPago ?? true),
-  ),
+  PAYMENT_METHODS.filter((m) => {
+    if (m.key === 'transfer') return options.value?.transfer
+    if (m.key === 'cash') return options.value?.cash
+    return options.value?.mercadoPago ?? true
+  }),
 )
 // A store that turned Mercado Pago off must not start on it.
 watch(paymentMethods, (methods) => {
@@ -74,6 +81,7 @@ const auth = useAuthStore()
 const form = reactive({
   name: auth.user?.name ?? '',
   email: auth.user?.email ?? '',
+  phone: '',
   address: '',
   zip: '',
 })
@@ -107,7 +115,8 @@ function refusal(error: unknown): string {
 async function placeOrder() {
   if (busy.value || paymentMethods.value.length === 0) return
   const missingAddress = delivery.value === 'home' && (!form.address.trim() || !form.zip.trim())
-  if (!form.name.trim() || !form.email.trim() || missingAddress) {
+  const missingContact = grocery.value ? !form.phone.trim() : !form.email.trim()
+  if (!form.name.trim() || missingContact || missingAddress) {
     formError.value = true
     return
   }
@@ -118,6 +127,7 @@ async function placeOrder() {
     const placed = await submitOrder(
       {
         email: form.email.trim(),
+        ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
         name: form.name.trim(),
         delivery: delivery.value,
         address:
@@ -188,8 +198,19 @@ async function placeOrder() {
                 placeholder="Juan Pérez"
               />
             </div>
+            <div v-if="grocery" class="field">
+              <label for="co-phone">Teléfono</label>
+              <input
+                id="co-phone"
+                v-model="form.phone"
+                class="input"
+                type="tel"
+                autocomplete="tel"
+                placeholder="11 5555-1234"
+              />
+            </div>
             <div class="field">
-              <label for="co-email">Email</label>
+              <label for="co-email">{{ grocery ? 'Email (opcional)' : 'Email' }}</label>
               <input
                 id="co-email"
                 v-model="form.email"

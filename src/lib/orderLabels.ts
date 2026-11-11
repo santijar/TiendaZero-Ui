@@ -18,6 +18,7 @@ export const FULFILLMENT_LABELS: Record<Order['fulfillment'], string> = {
 export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
   mercadopago: 'Mercado Pago',
   transfer: 'Transferencia',
+  cash: 'Efectivo',
 }
 
 export function formatDate(iso: string, withTime = false): string {

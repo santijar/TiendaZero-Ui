@@ -60,8 +60,14 @@ const paymentNote = computed(() => {
 })
 
 // A paid order's way to the shopper, as the store moves it along.
+// A cash order is prepared before it is paid, so it is followed through the same steps from "received".
+const cashInProgress = computed(
+  () => order.value?.status === 'pending' && order.value.paymentMethod === 'cash',
+)
 const fulfillmentSteps = computed(() => [
-  { key: 'paid', label: 'Pagado' },
+  cashInProgress.value
+    ? { key: 'unfulfilled', label: 'Recibido' }
+    : { key: 'paid', label: 'Pagado' },
   { key: 'preparing', label: 'Preparando' },
   order.value?.delivery === 'pickup'
     ? { key: 'ready-for-pickup', label: 'Listo para retirar' }
@@ -83,7 +89,7 @@ const fulfillmentTitle = computed(() => {
     case 'delivered':
       return '¡Pedido entregado!'
     default:
-      return '¡Pedido confirmado!'
+      return cashInProgress.value ? 'Recibimos tu pedido' : '¡Pedido confirmado!'
   }
 })
 
@@ -199,11 +205,15 @@ onBeforeUnmount(() => {
 
     <template v-else>
       <div class="head">
-        <template v-if="order.status === 'paid'">
+        <template v-if="order.status === 'paid' || cashInProgress">
           <div class="badge"><AppIcon name="check" :size="28" :stroke-width="18" /></div>
           <h1>{{ fulfillmentTitle }}</h1>
           <p class="lead">
-            <template v-if="order.fulfillment === 'unfulfilled'">
+            <template v-if="cashInProgress && order.fulfillment !== 'delivered'">
+              Pagás <span>{{ formatPrice(order.total) }}</span> en efectivo
+              {{ order.delivery === 'pickup' ? 'cuando lo retirás' : 'cuando te lo entregamos' }}.
+            </template>
+            <template v-if="order.fulfillment === 'unfulfilled' && order.email">
               Te enviamos el detalle a {{ order.email }}.
             </template>
             <template v-else-if="order.fulfillment === 'ready-for-pickup'">
@@ -232,8 +242,14 @@ onBeforeUnmount(() => {
         <template v-else-if="order.status === 'expired'">
           <h1>El pedido venció</h1>
           <p class="lead">
-            No recibimos el pago de <span>{{ order.number }}</span> a tiempo, así que los productos
-            volvieron a estar a la venta.
+            <template v-if="order.paymentMethod === 'cash'">
+              No llegamos a preparar <span>{{ order.number }}</span> a tiempo, así que los productos
+              volvieron a estar a la venta.
+            </template>
+            <template v-else>
+              No recibimos el pago de <span>{{ order.number }}</span> a tiempo, así que los
+              productos volvieron a estar a la venta.
+            </template>
           </p>
         </template>
 
@@ -242,7 +258,9 @@ onBeforeUnmount(() => {
           <p class="lead">
             Reservamos tu pedido <span>{{ order.number }}</span> hasta el {{ deadline }} h.
             Transferí <span>{{ formatPrice(order.total) }}</span> a esta cuenta y lo confirmamos
-            apenas se acredite. También te enviamos estos datos a {{ order.email }}.
+            apenas se acredite.<template v-if="order.email">
+              También te enviamos estos datos a {{ order.email }}.</template
+            >
           </p>
           <dl v-if="order.transfer" class="card transfer">
             <div>
@@ -288,7 +306,7 @@ onBeforeUnmount(() => {
         </template>
 
         <button
-          v-if="order.status !== 'pending'"
+          v-if="order.status !== 'pending' || cashInProgress"
           type="button"
           class="btn btn-primary"
           @click="keepShopping"

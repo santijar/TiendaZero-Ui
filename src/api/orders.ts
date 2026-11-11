@@ -4,7 +4,7 @@
 import { request } from './http'
 
 export type OrderStatus = 'pending' | 'paid' | 'expired'
-export type PaymentMethod = 'mercadopago' | 'transfer'
+export type PaymentMethod = 'mercadopago' | 'transfer' | 'cash'
 export type Delivery = 'home' | 'pickup'
 
 export interface ShippingAddress {
@@ -35,8 +35,10 @@ export interface Order {
   status: OrderStatus
   paymentMethod: PaymentMethod
   delivery: Delivery
+  // Empty when the shopper left none (a grocery asks for a phone instead).
   email: string
   customerName: string
+  phone: string | null
   shippingAddress: ShippingAddress | null
   lines: OrderLine[]
   subtotal: number
@@ -91,7 +93,9 @@ export interface OrderSummary {
 }
 
 export interface PlaceOrderRequest {
+  // A grocery takes no email (send an empty one) but needs a phone; every other store needs an email.
   email: string
+  phone?: string
   name: string
   delivery: Delivery
   address: ShippingAddress | null

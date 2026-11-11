@@ -304,15 +304,21 @@ function createOrderServer(
         if (!items?.length) return json({ detail: 'Tu carrito está vacío.' }, 422)
         const subtotal = items.reduce((n, i) => n + i.lineTotal, 0)
         const transfer = body.paymentMethod === 'transfer'
+        const cash = body.paymentMethod === 'cash'
         const discount = transfer ? subtotal * 0.1 : 0
         const number = `RG-${20001 + orders.size}`
         const order = {
           number,
           status: 'pending' as const,
-          paymentMethod: transfer ? ('transfer' as const) : ('mercadopago' as const),
+          paymentMethod: transfer
+            ? ('transfer' as const)
+            : cash
+              ? ('cash' as const)
+              : ('mercadopago' as const),
           delivery: body.delivery as 'home' | 'pickup',
-          email: String(body.email),
+          email: String(body.email ?? ''),
           customerName: String(body.name),
+          phone: typeof body.phone === 'string' ? body.phone : null,
           shippingAddress: (body.address as Order['shippingAddress']) ?? null,
           lines: items.map((i) => ({
             productSlug: i.productSlug,
@@ -329,7 +335,11 @@ function createOrderServer(
           discount,
           total: subtotal - discount,
           createdAt: '2026-11-02T15:00:00Z',
-          expiresAt: transfer ? '2026-11-04T15:00:00Z' : '2026-11-02T15:30:00Z',
+          expiresAt: transfer
+            ? '2026-11-04T15:00:00Z'
+            : cash
+              ? '2026-11-02T16:00:00Z'
+              : '2026-11-02T15:30:00Z',
           paidAt: null,
           transfer: transfer
             ? {
@@ -413,9 +423,12 @@ function createAdminServer(
       needsReview: false,
       reviewNotes: null,
       payments: [],
+      // A cash order is prepared before it is paid.
       nextFulfillment:
-        order.status === 'paid' ? path.slice(path.indexOf(order.fulfillment) + 1) : [],
-      canMarkPaid: order.paymentMethod === 'transfer' && order.status !== 'paid',
+        order.status === 'paid' || (order.status === 'pending' && order.paymentMethod === 'cash')
+          ? path.slice(path.indexOf(order.fulfillment) + 1)
+          : [],
+      canMarkPaid: order.paymentMethod !== 'mercadopago' && order.status !== 'paid',
     }
   }
 

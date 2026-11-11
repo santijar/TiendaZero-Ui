@@ -9,7 +9,7 @@ cart comes from the Api (step 3, `src/api/cart.ts`). Customer accounts are built
 `/restablecer` and `/cuenta` (profile name, order history and favorites). Checkout is real
 (step 5, `src/api/orders.ts`): confirming places the order with one idempotency key per checkout
 visit. A Mercado Pago order then leaves for Checkout Pro (`leaveTo` in `src/lib/navigation.ts`,
-stubbed in tests). A transfer order goes to `/pedido/:number`, which shows the bank details.
+stubbed in tests). A transfer order goes to `/pedido/:number`, which shows the bank details. A cash order goes there too and is followed from "Recibido" through preparation and delivery before it is paid (`cashInProgress` in `OrderView.vue`); it says whether it is paid on delivery or on pickup. At a store whose theme has `storeKind: 'Grocery'` the checkout asks for a phone (required), makes the email optional and sends an empty one when it is left blank; every other store is unchanged. Cash is listed only when `checkout-options.cash` is true. Tests: `cashOrders.spec.ts`.
 The order page also opens from the emailed link (`?token=`, remembered in localStorage by
 `src/lib/orderAccess.ts` and then dropped from the URL). Every time it opens an unpaid Mercado Pago order it
 syncs with the Api, because Mercado Pago offers no way back to a non-public address and shoppers

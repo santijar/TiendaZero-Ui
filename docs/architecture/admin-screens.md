@@ -51,13 +51,17 @@ no design in the bundle: it's built from Nocturne's `.table`, `.card`, `.input` 
   Tests: `adminPickup.spec.ts`, and `orders.spec.ts` ("what the store offers at checkout"); the fake Api's `api.checkoutOptions` models a
   store without pickup or transfer, and `api.admin.pickup` keeps the settings.
 
+- Cash orders in the admin (`AdminOrderView.vue`): a pending cash order can be moved through preparation and delivery before it is paid
+  (the Api's `nextFulfillment` says so), and "Cobré en efectivo" marks it paid. An order without an email shows "No dejó email" and its
+  phone, and the "each change emails the customer" note is hidden. Tests: `cashOrders.spec.ts`.
+
 - Checkout settings screen: `/admin/cobros` (`AdminCheckoutSettingsView.vue`, "Cobros y WhatsApp" in the admin sidebar, client in
   `src/api/admin.ts`). The WhatsApp number that receives orders (typed freely, the Api keeps the digits and refuses one that can't be
   dialed) and two switches, cash and Mercado Pago. The form shows what the Api resolves for the store's kind when nothing was saved: a
   grocery starts with cash only. Saving changes `GET /api/checkout-options` (`cash`, `mercadoPago`, `whatsappNumber`): the checkout
   hides Mercado Pago when it is off, starts on the first method left, and with none left says so and disables "Confirmar pedido".
-  **Cash is not listed at checkout yet**: the Api cannot place a cash order until its cash path exists. `GET /api/theme` now carries
-  `storeKind` ('Standard' | 'Grocery') and the platform tenant list `kind`; nothing in the Ui reads them yet. Tests:
+  Cash is listed at checkout when it is on (see `storefront.md`). `GET /api/theme` carries `storeKind` ('Standard' | 'Grocery'), which the
+  checkout reads to ask a grocery's shoppers for a phone; the platform tenant list carries `kind`. Tests:
   `adminCheckoutSettings.spec.ts` and `orders.spec.ts`; the fake Api's `api.admin.checkoutSettings` keeps the settings and updates
   `api.checkoutOptions` as the real one would.
 
