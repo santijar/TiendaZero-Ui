@@ -3,12 +3,13 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/http'
-import { getOrder, startCheckout, syncOrder, type Order } from '@/api/orders'
+import { getCheckoutOptions, getOrder, startCheckout, syncOrder, type Order } from '@/api/orders'
 import AppIcon from '@/components/AppIcon.vue'
 import ProductImage from '@/components/ProductImage.vue'
 import { formatPrice, productCountLabel } from '@/lib/commerce'
 import { leaveTo } from '@/lib/navigation'
 import { orderToken, rememberOrderToken } from '@/lib/orderAccess'
+import { orderWhatsappUrl } from '@/lib/whatsapp'
 import { useAuthStore } from '@/stores/auth'
 import { useCatalogStore } from '@/stores/catalog'
 
@@ -26,6 +27,13 @@ const auth = useAuthStore()
 const catalog = useCatalogStore()
 
 const order = ref<Order | null>(null)
+// The store's WhatsApp number from its checkout options; null when it has none (or they could not be read).
+const whatsappNumber = ref<string | null>(null)
+const whatsappUrl = computed(() =>
+  order.value && whatsappNumber.value && order.value.status !== 'expired'
+    ? orderWhatsappUrl(whatsappNumber.value, order.value)
+    : null,
+)
 const state = ref<'loading' | 'ready' | 'not-found' | 'error'>('loading')
 const paying = ref(false)
 const payError = ref<string | null>(null)
@@ -108,6 +116,9 @@ async function load() {
   const returningFromMercadoPago = 'payment_id' in rest || 'collection_status' in rest
 
   await auth.ready()
+  void getCheckoutOptions()
+    .then((o) => (whatsappNumber.value = o.whatsappNumber))
+    .catch(() => {})
   try {
     order.value = await getOrder(props.number, token)
     state.value = 'ready'
@@ -304,6 +315,16 @@ onBeforeUnmount(() => {
           </div>
           <span v-if="payError" class="form-error" role="alert">{{ payError }}</span>
         </template>
+
+        <a
+          v-if="whatsappUrl"
+          :href="whatsappUrl"
+          class="btn btn-secondary"
+          target="_blank"
+          rel="noopener"
+        >
+          Enviar mi pedido por WhatsApp
+        </a>
 
         <button
           v-if="order.status !== 'pending' || cashInProgress"

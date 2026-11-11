@@ -172,6 +172,41 @@ export const useCartStore = defineStore('cart', () => {
     }
   }
 
+  // Puts the lines of an earlier order in the cart (repeat order). Each line is added on its own, so one that is gone or
+  // short of stock doesn't stop the rest: it is added as far as stock allows and reported back in `issues`.
+  async function addLines(
+    wanted: { productSlug: string; name: string; size: string; quantity: number }[],
+  ): Promise<{ added: number; issues: string[] }> {
+    let added = 0
+    const issues: string[] = []
+    for (const line of wanted) {
+      const put = async (quantity: number) => {
+        await withCart(
+          (t) => addCartItem(t, { productSlug: line.productSlug, size: line.size, quantity }),
+          true,
+        )
+        added += quantity
+      }
+      try {
+        await put(line.quantity)
+      } catch (error) {
+        const stock = error instanceof ApiError && error.status === 409 ? error.problem : null
+        const free = stock ? Number(stock.stock ?? 0) - Number(stock.inCart ?? 0) : 0
+        if (free > 0) {
+          try {
+            await put(free)
+            issues.push(`${line.name}: solo pudimos sumar ${free}`)
+            continue
+          } catch {
+            // Falls through to the generic message.
+          }
+        }
+        issues.push(`${line.name}: ${stock ? 'no hay stock' : 'ya no está disponible'}`)
+      }
+    }
+    return { added, issues }
+  }
+
   async function changeQty(line: CartLine, delta: number) {
     const qty = line.qty + delta
     updating.value = true
@@ -223,6 +258,7 @@ export const useCartStore = defineStore('cart', () => {
     afterOrderPlaced,
     reload,
     add,
+    addLines,
     changeQty,
     remove,
     clear,

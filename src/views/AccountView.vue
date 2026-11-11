@@ -3,14 +3,16 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/http'
-import { getMyOrders, type OrderSummary } from '@/api/orders'
+import { getMyOrders, getOrder, type OrderSummary } from '@/api/orders'
 import ProductCard from '@/components/ProductCard.vue'
 import { formatPrice, productCountLabel } from '@/lib/commerce'
 import { STATUS_LABELS, formatDate as orderDate } from '@/lib/orderLabels'
 import { useAuthStore } from '@/stores/auth'
+import { useCartStore } from '@/stores/cart'
 import { useFavoritesStore } from '@/stores/favorites'
 
 const auth = useAuthStore()
+const cart = useCartStore()
 const favorites = useFavoritesStore()
 const router = useRouter()
 
@@ -38,6 +40,44 @@ async function saveName() {
     nameError.value =
       (e instanceof ApiError && e.fieldError('name')) || 'No pudimos guardar el nombre.'
     nameStatus.value = 'idle'
+  }
+}
+
+// Repeat an order: its lines go into the cart (as far as the catalog still allows) and the cart opens to review them.
+const repeating = ref<string | null>(null)
+const repeatNotice = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
+
+async function repeatOrder(number: string) {
+  repeating.value = number
+  repeatNotice.value = null
+  try {
+    const order = await getOrder(number, null)
+    const { added, issues } = await cart.addLines(
+      order.lines.map((l) => ({
+        productSlug: l.productSlug,
+        name: l.name,
+        size: l.size,
+        quantity: l.quantity,
+      })),
+    )
+    if (added === 0) {
+      repeatNotice.value = {
+        kind: 'error',
+        text: `No pudimos sumar nada de ${number}. ${issues.join('. ')}.`,
+      }
+      return
+    }
+    repeatNotice.value = {
+      kind: 'ok',
+      text: issues.length
+        ? `Sumamos lo que había de ${number} al carrito. ${issues.join('. ')}.`
+        : `Sumamos ${productCountLabel(added)} de ${number} al carrito.`,
+    }
+    cart.open()
+  } catch {
+    repeatNotice.value = { kind: 'error', text: 'No pudimos repetir el pedido. Probá de nuevo.' }
+  } finally {
+    repeating.value = null
   }
 }
 
@@ -103,8 +143,24 @@ async function signOut() {
             </span>
             <span class="order-total">{{ formatPrice(o.total) }}</span>
           </RouterLink>
+          <button
+            type="button"
+            class="btn btn-ghost repeat"
+            :aria-label="`Repetir el pedido ${o.number}`"
+            :disabled="repeating !== null"
+            @click="repeatOrder(o.number)"
+          >
+            {{ repeating === o.number ? 'Sumando…' : 'Repetir pedido' }}
+          </button>
         </li>
       </ul>
+      <span
+        v-if="repeatNotice"
+        :class="repeatNotice.kind === 'ok' ? 'form-note' : 'form-error'"
+        role="status"
+      >
+        {{ repeatNotice.text }}
+      </span>
     </section>
 
     <section class="section">
@@ -203,6 +259,21 @@ async function signOut() {
   padding: 12px 14px;
   color: inherit;
   text-decoration: none;
+}
+
+.orders li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.orders li .order {
+  align-self: stretch;
+}
+
+.repeat {
+  font-size: 12px;
 }
 
 .order:hover {

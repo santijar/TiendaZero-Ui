@@ -112,11 +112,13 @@ function createCartServer() {
         return json(toCart(items))
       }
       if (method === 'POST' && path === '/api/cart/items') {
-        const product = PRODUCTS.find((p) => p.slug === body.productSlug)!
+        const product = PRODUCTS.find((p) => p.slug === body.productSlug)
+        if (!product) return json({ status: 404 }, 404)
         const size = String(body.size)
         const stock = STOCK[`${product.slug}/${size}`] ?? 99
         const existing = items.find((i) => i.productSlug === product.slug && i.size === size)
-        const quantity = (existing?.quantity ?? 0) + 1
+        const added = Number(body.quantity ?? 1)
+        const quantity = (existing?.quantity ?? 0) + added
         if (quantity > stock) return json({ stock, inCart: existing?.quantity ?? 0 }, 409)
         if (existing) setQty(existing, quantity)
         else {
@@ -127,8 +129,8 @@ function createCartServer() {
             size,
             color: product.color,
             unitPrice: product.price,
-            quantity: 1,
-            lineTotal: product.price,
+            quantity: added,
+            lineTotal: product.price * added,
             imageUrl: product.imageUrl,
             maxQuantity: stock,
           })
