@@ -46,6 +46,7 @@ const form = reactive({
   price: 0,
   color: '',
   badge: '',
+  brand: '',
   categoryId: 0,
   collectionIds: [] as number[],
   isActive: true,
@@ -73,6 +74,7 @@ function fill(p: AdminProduct) {
     price: p.price,
     color: p.color,
     badge: p.badge ?? '',
+    brand: p.brand ?? '',
     categoryId: p.categoryId,
     collectionIds: [...p.collectionIds],
     isActive: p.isActive,
@@ -160,6 +162,7 @@ function toBody(): SaveProduct {
   return {
     ...form,
     badge: form.badge.trim() || null,
+    brand: form.brand.trim() || null,
     price: Number(form.price),
     variants: sizes.value.map((s) => ({
       id: s.id,
@@ -362,6 +365,11 @@ onMounted(load)
             <label for="p-color">Color</label>
             <input id="p-color" v-model="form.color" class="input" />
             <span v-if="errors.color" class="form-error">{{ errors.color }}</span>
+          </div>
+          <div class="field">
+            <label for="p-brand">Marca (opcional)</label>
+            <input id="p-brand" v-model="form.brand" class="input" placeholder="La Independencia" />
+            <span v-if="errors.brand" class="form-error">{{ errors.brand }}</span>
           </div>
           <div class="field">
             <label for="p-badge">Etiqueta (opcional)</label>

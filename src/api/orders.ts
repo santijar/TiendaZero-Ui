@@ -17,6 +17,8 @@ export interface OrderLine {
   name: string
   size: string
   color: string
+  // The brand the product had when it was bought.
+  brand: string | null
   imageUrl: string | null
   unitPrice: number
   quantity: number

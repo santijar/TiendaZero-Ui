@@ -20,6 +20,7 @@ export interface CartLine {
   name: string
   price: number
   color: string
+  brand: string | null
   imageUrl: string | null
   size: string
   qty: number
@@ -83,6 +84,7 @@ export const useCartStore = defineStore('cart', () => {
       name: i.name,
       price: i.unitPrice,
       color: i.color,
+      brand: i.brand,
       imageUrl: i.imageUrl,
       size: i.size,
       qty: i.quantity,

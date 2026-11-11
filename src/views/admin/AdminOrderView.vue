@@ -12,7 +12,9 @@ import {
 import { ApiError } from '@/api/http'
 import { formatPrice } from '@/lib/commerce'
 import { FULFILLMENT_LABELS, PAYMENT_LABELS, STATUS_LABELS, formatDate } from '@/lib/orderLabels'
+import { useThemeStore } from '@/stores/theme'
 
+const theme = useThemeStore()
 const props = defineProps<{ number: string }>()
 
 const data = ref<AdminOrder | null>(null)
@@ -280,7 +282,10 @@ onMounted(load)
             <tbody>
               <tr v-for="l in order.lines" :key="l.productSlug + l.size">
                 <td>
-                  {{ l.name }} <span class="admin-muted">{{ l.color }}</span>
+                  {{ l.name }}
+                  <span class="admin-muted">{{
+                    [l.brand, theme.isGrocery ? null : l.color].filter(Boolean).join(' · ')
+                  }}</span>
                 </td>
                 <td>{{ l.size }}</td>
                 <td class="admin-num">{{ l.quantity }}</td>

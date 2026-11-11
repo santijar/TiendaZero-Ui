@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { SHIPPING_COST, formatPrice, installmentsLabel, productCountLabel } from '@/lib/commerce'
+import { lineLabel } from '@/lib/lineLabel'
 import { useCartStore } from '@/stores/cart'
 import { useThemeStore } from '@/stores/theme'
 import AppIcon from './AppIcon.vue'
@@ -67,7 +68,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   <AppIcon name="trash" />
                 </button>
               </div>
-              <span v-if="!theme.isGrocery" class="meta">Talle {{ l.size }} · {{ l.color }}</span>
+              <span v-if="!theme.isGrocery || l.brand" class="meta">{{
+                [lineLabel(l, { grocery: theme.isGrocery }), theme.isGrocery ? null : l.color]
+                  .filter(Boolean)
+                  .join(' · ')
+              }}</span>
               <div class="info-bottom">
                 <div class="stepper">
                   <button
