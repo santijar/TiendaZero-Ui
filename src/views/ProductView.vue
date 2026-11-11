@@ -110,6 +110,7 @@ function addToCart() {
         <div class="intro">
           <span class="card-kicker">{{ product.categoryName }}</span>
           <h1>{{ product.name }}</h1>
+          <span v-if="product.brand" class="brand">{{ product.brand }}</span>
           <span class="price">{{ formatPrice(product.price) }}</span>
           <span v-if="!theme.isGrocery" class="installments">{{
             installmentsLabel(product.price)
@@ -263,6 +264,11 @@ function addToCart() {
   line-height: 1.6;
   color: var(--color-neutral-300);
   text-wrap: pretty;
+}
+
+.brand {
+  font-size: 14px;
+  color: var(--color-neutral-400);
 }
 
 .color {

@@ -52,7 +52,9 @@
   cursor: pointer;
 }
 
-.admin-num {
+.admin-num,
+.table th.admin-num,
+.table td.admin-num {
   text-align: right;
   white-space: nowrap;
 }

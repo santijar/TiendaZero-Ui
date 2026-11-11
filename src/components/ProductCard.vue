@@ -62,6 +62,7 @@ function quickAdd() {
       </button>
     </div>
     <div class="details">
+      <span v-if="product.brand" class="brand">{{ product.brand }}</span>
       <RouterLink
         :to="{ name: 'product', params: { slug: product.slug } }"
         class="name"
@@ -69,7 +70,9 @@ function quickAdd() {
       >
         {{ product.name }}
       </RouterLink>
-      <span class="meta">{{ product.categoryName }} · {{ product.color }}</span>
+      <span class="meta">{{
+        theme.isGrocery ? product.categoryName : `${product.categoryName} · ${product.color}`
+      }}</span>
       <span class="price">{{ formatPrice(product.price) }}</span>
     </div>
   </div>
@@ -81,6 +84,13 @@ function quickAdd() {
   flex-direction: column;
   gap: 10px;
   cursor: pointer;
+}
+
+.brand {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-neutral-400);
 }
 
 .media {

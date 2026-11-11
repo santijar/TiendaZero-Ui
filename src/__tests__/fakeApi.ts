@@ -37,6 +37,7 @@ export const PRODUCTS: ProductSummary[] = [
     price: 48900,
     color: 'Negro',
     badge: 'Nuevo',
+    brand: null,
     imageUrl: '/media/products/cam-titular.webp',
     sizes: ['S', 'M', 'L'],
   },
@@ -48,6 +49,7 @@ export const PRODUCTS: ProductSummary[] = [
     price: 54900,
     color: 'Negro',
     badge: null,
+    brand: null,
     imageUrl: null,
     sizes: ['Único'],
   },
@@ -61,6 +63,7 @@ export const TITULAR_DETAIL: ProductDetail = {
   price: 48900,
   color: 'Negro',
   badge: 'Nuevo',
+  brand: null,
   description: 'Tela dry-fit liviana.',
   sizes: [
     { size: 'S', inStock: false },
@@ -79,6 +82,7 @@ export const BOLSO_DETAIL: ProductDetail = {
   price: 54900,
   color: 'Negro',
   badge: null,
+  brand: null,
   description: 'Bolso de 40 L.',
   sizes: [{ size: 'Único', inStock: true }],
   images: [],
@@ -142,6 +146,7 @@ function createCartServer() {
             name: product.name,
             size,
             color: product.color,
+            brand: product.brand,
             unitPrice: product.price,
             quantity: added,
             lineTotal: product.price * added,
@@ -361,6 +366,7 @@ function createOrderServer(
             name: i.name,
             size: i.size,
             color: i.color,
+            brand: i.brand,
             imageUrl: i.imageUrl,
             unitPrice: i.unitPrice,
             quantity: i.quantity,
@@ -432,6 +438,7 @@ function createAdminServer(
     price: 48900,
     color: 'Negro',
     badge: 'Nuevo',
+    brand: null,
     categoryId: 1,
     collectionIds: [],
     isActive: true,
@@ -516,6 +523,9 @@ function createAdminServer(
       }
       if (path === '/api/admin/products/1' && method === 'PUT') {
         const save = body as unknown as SaveProduct
+        if ((save.brand ?? '').length > 80) {
+          return json({ errors: { brand: ['La marca puede tener hasta 80 caracteres.'] } }, 400)
+        }
         state.saves.push(save)
         for (const v of save.variants) {
           const current = state.product.variants.find((c) => c.id === v.id)
@@ -531,6 +541,7 @@ function createAdminServer(
         state.product = {
           ...state.product,
           name: save.name,
+          brand: save.brand ?? null,
           variants: save.variants.map((v, i) => {
             const current = state.product.variants.find((c) => c.id === v.id)
             return {
@@ -739,6 +750,7 @@ export const INDIANS_PRODUCTS: ProductSummary[] = [
     price: 54900,
     color: 'Blanco y celeste',
     badge: null,
+    brand: null,
     imageUrl: null,
     sizes: ['S', 'M'],
   },

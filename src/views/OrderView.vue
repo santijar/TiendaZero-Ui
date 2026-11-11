@@ -7,6 +7,7 @@ import { getCheckoutOptions, getOrder, startCheckout, syncOrder, type Order } fr
 import AppIcon from '@/components/AppIcon.vue'
 import ProductImage from '@/components/ProductImage.vue'
 import { formatPrice, productCountLabel } from '@/lib/commerce'
+import { lineLabel } from '@/lib/lineLabel'
 import { leaveTo } from '@/lib/navigation'
 import { orderToken, rememberOrderToken } from '@/lib/orderAccess'
 import { orderWhatsappUrl } from '@/lib/whatsapp'
@@ -348,11 +349,9 @@ onBeforeUnmount(() => {
           </div>
           <div class="line-info">
             <span class="line-name">{{ l.name }}</span>
-            <span class="line-meta"
-              ><template v-if="!theme.isGrocery">Talle {{ l.size }} · </template>x{{
-                l.quantity
-              }}</span
-            >
+            <span class="line-meta">{{
+              lineLabel(l, { grocery: theme.isGrocery, quantity: l.quantity })
+            }}</span>
           </div>
           <span class="line-total">{{ formatPrice(l.lineTotal) }}</span>
         </div>

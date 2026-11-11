@@ -19,6 +19,7 @@ import {
   formatPrice,
   productCountLabel,
 } from '@/lib/commerce'
+import { lineLabel } from '@/lib/lineLabel'
 import { leaveTo } from '@/lib/navigation'
 import { rememberOrderToken } from '@/lib/orderAccess'
 import { useAuthStore } from '@/stores/auth'
@@ -304,9 +305,7 @@ async function placeOrder() {
           </div>
           <div class="line-info">
             <span class="line-name">{{ l.name }}</span>
-            <span class="line-meta"
-              ><template v-if="!grocery">Talle {{ l.size }} · </template>x{{ l.qty }}</span
-            >
+            <span class="line-meta">{{ lineLabel(l, { grocery, quantity: l.qty }) }}</span>
           </div>
           <span class="line-total">{{ formatPrice(l.total) }}</span>
         </div>

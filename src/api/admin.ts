@@ -62,6 +62,8 @@ export interface AdminProduct {
   price: number
   color: string
   badge: string | null
+  // Who makes it; the store's own words, up to 80 characters.
+  brand: string | null
   categoryId: number
   collectionIds: number[]
   isActive: boolean

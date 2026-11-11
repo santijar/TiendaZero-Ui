@@ -18,6 +18,8 @@ export interface ProductSummary {
   badge: string | null
   imageUrl: string | null
   sizes: string[]
+  // Who makes it ("La Independencia"); null when the store did not say.
+  brand: string | null
 }
 
 export interface ProductPage {
