@@ -4,10 +4,12 @@ import { useRouter } from 'vue-router'
 
 import { SHIPPING_COST, formatPrice, installmentsLabel, productCountLabel } from '@/lib/commerce'
 import { useCartStore } from '@/stores/cart'
+import { useThemeStore } from '@/stores/theme'
 import AppIcon from './AppIcon.vue'
 import ProductImage from './ProductImage.vue'
 
 const cart = useCartStore()
+const theme = useThemeStore()
 const router = useRouter()
 
 const total = computed(() => cart.subtotal + SHIPPING_COST)
@@ -65,7 +67,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   <AppIcon name="trash" />
                 </button>
               </div>
-              <span class="meta">Talle {{ l.size }} · {{ l.color }}</span>
+              <span v-if="!theme.isGrocery" class="meta">Talle {{ l.size }} · {{ l.color }}</span>
               <div class="info-bottom">
                 <div class="stepper">
                   <button
@@ -93,18 +95,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
 
         <div class="summary">
-          <span class="ship-msg">Tenés envío gratis en este pedido.</span>
+          <span v-if="!theme.isGrocery" class="ship-msg">Tenés envío gratis en este pedido.</span>
           <div class="row">
             <span class="muted">Subtotal</span><span>{{ formatPrice(cart.subtotal) }}</span>
           </div>
           <div class="row">
             <span class="muted">Envío</span>
-            <span>{{ SHIPPING_COST ? formatPrice(SHIPPING_COST) : 'Gratis' }}</span>
+            <span v-if="theme.isGrocery">Según tu zona</span>
+            <span v-else>{{ SHIPPING_COST ? formatPrice(SHIPPING_COST) : 'Gratis' }}</span>
           </div>
           <div class="row total">
             <span>Total</span><span class="total-amount">{{ formatPrice(total) }}</span>
           </div>
-          <span class="installments">{{ installmentsLabel(total) }}</span>
+          <span v-if="!theme.isGrocery" class="installments">{{ installmentsLabel(total) }}</span>
           <button type="button" class="btn btn-primary finish" @click="checkout">
             Finalizar compra
           </button>

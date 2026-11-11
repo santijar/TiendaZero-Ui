@@ -12,6 +12,7 @@ import {
 } from '@/api/cart'
 import { ApiError } from '@/api/http'
 import { useAuthStore } from './auth'
+import { useThemeStore } from './theme'
 
 export interface CartLine {
   id: number
@@ -56,13 +57,13 @@ function writeToken(token: string | null) {
 
 const isNotFound = (error: unknown) => error instanceof ApiError && error.status === 404
 
-function stockMessage(error: unknown): string | null {
+// What the stock conflict means to the shopper: "de este talle" for clothes, "de este producto" for a grocery.
+function stockMessage(error: unknown, grocery = false): string | null {
   if (!(error instanceof ApiError) || error.status !== 409) return null
   const stock = Number(error.problem?.stock ?? 0)
-  if (stock === 0) return 'No queda stock de este talle.'
-  return stock === 1
-    ? 'Solo queda 1 unidad de este talle.'
-    : `Solo quedan ${stock} unidades de este talle.`
+  const of = grocery ? 'de este producto' : 'de este talle'
+  if (stock === 0) return `No queda stock ${of}.`
+  return stock === 1 ? `Solo queda 1 unidad ${of}.` : `Solo quedan ${stock} unidades ${of}.`
 }
 
 export const useCartStore = defineStore('cart', () => {
@@ -164,10 +165,18 @@ export const useCartStore = defineStore('cart', () => {
   async function add(product: { slug: string; name: string }, size: string): Promise<boolean> {
     try {
       await withCart((t) => addCartItem(t, { productSlug: product.slug, size }), true)
-      showToast('success', `${product.name} · Talle ${size} agregado`)
+      const grocery = useThemeStore().isGrocery
+      showToast(
+        'success',
+        grocery ? `${product.name} agregado` : `${product.name} · Talle ${size} agregado`,
+      )
       return true
     } catch (error) {
-      showToast('error', stockMessage(error) ?? 'No pudimos agregar el producto. Probá de nuevo.')
+      showToast(
+        'error',
+        stockMessage(error, useThemeStore().isGrocery) ??
+          'No pudimos agregar el producto. Probá de nuevo.',
+      )
       return false
     }
   }
@@ -214,7 +223,10 @@ export const useCartStore = defineStore('cart', () => {
       if (qty <= 0) await withCart((t) => removeCartItem(t, line.id))
       else await withCart((t) => updateCartItem(t, line.id, qty))
     } catch (error) {
-      showToast('error', stockMessage(error) ?? 'No pudimos actualizar el carrito.')
+      showToast(
+        'error',
+        stockMessage(error, useThemeStore().isGrocery) ?? 'No pudimos actualizar el carrito.',
+      )
     } finally {
       updating.value = false
     }

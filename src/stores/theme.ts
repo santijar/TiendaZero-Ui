@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import { getTheme, type Theme } from '@/api/theme'
@@ -33,5 +33,9 @@ export const useThemeStore = defineStore('theme', () => {
     clearTheme()
   }
 
-  return { theme, load, ensureLoaded, reset }
+  // A grocery is sold by the pack, not by size or color, takes no installments and charges shipping by zone, so the
+  // storefront drops the apparel wording for it (sizes, color, "cambios gratis", "envío gratis", cuotas).
+  const isGrocery = computed(() => theme.value?.storeKind === 'Grocery')
+
+  return { theme, isGrocery, load, ensureLoaded, reset }
 })

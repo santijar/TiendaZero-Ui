@@ -70,6 +70,20 @@ export const TITULAR_DETAIL: ProductDetail = {
   images: [{ url: '/media/products/cam-titular.webp', alt: 'Camiseta Titular 26' }],
 }
 
+// A product with a single variant (a grocery's "Unidad", here the Bolso's "Único"), for the pages that pick it for the shopper.
+export const BOLSO_DETAIL: ProductDetail = {
+  slug: 'bolso',
+  name: 'Bolso Deportivo',
+  categorySlug: 'accesorios',
+  categoryName: 'Accesorios',
+  price: 54900,
+  color: 'Negro',
+  badge: null,
+  description: 'Bolso de 40 L.',
+  sizes: [{ size: 'Único', inStock: true }],
+  images: [],
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -1301,6 +1315,7 @@ export function stubApi() {
         return json({ items, total: items.length, page: 1, pageSize: 48 })
       }
       if (url.pathname === '/api/products/cam-titular' && !indians) return json(TITULAR_DETAIL)
+      if (url.pathname === '/api/products/bolso' && !indians) return json(BOLSO_DETAIL)
       return json({ status: 404 }, 404)
     }
     if (url.pathname.startsWith('/api/auth/')) {
@@ -1367,6 +1382,7 @@ export function stubApi() {
       return json({ items, total: items.length, page: 1, pageSize: 48 })
     }
     if (url.pathname === '/api/products/cam-titular') return json(TITULAR_DETAIL)
+    if (url.pathname === '/api/products/bolso') return json(BOLSO_DETAIL)
     return json({ status: 404 }, 404)
   })
   vi.stubGlobal('fetch', fetchMock)

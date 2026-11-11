@@ -7,6 +7,7 @@ import { formatPrice } from '@/lib/commerce'
 import { isPlatformHost } from '@/lib/platform'
 import { useCartStore } from '@/stores/cart'
 import { useFavoritesStore } from '@/stores/favorites'
+import { useThemeStore } from '@/stores/theme'
 import AppIcon from './AppIcon.vue'
 import ProductImage from './ProductImage.vue'
 
@@ -15,6 +16,7 @@ const props = defineProps<{ product: ProductSummary }>()
 const router = useRouter()
 const cart = useCartStore()
 const favorites = useFavoritesStore()
+const theme = useThemeStore()
 // In a platform admin's preview there is nothing to buy or save.
 const preview = isPlatformHost()
 
@@ -50,7 +52,13 @@ function quickAdd() {
         <AppIcon name="heart" :filled="isFavorite" />
       </button>
       <button v-if="!preview" type="button" class="btn btn-secondary quick" @click.stop="quickAdd">
-        {{ singleSize ? 'Agregar al carrito' : 'Elegir talle' }}
+        {{
+          singleSize
+            ? 'Agregar al carrito'
+            : theme.isGrocery
+              ? 'Elegir presentación'
+              : 'Elegir talle'
+        }}
       </button>
     </div>
     <div class="details">

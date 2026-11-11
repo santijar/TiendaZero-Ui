@@ -12,6 +12,7 @@ import { orderToken, rememberOrderToken } from '@/lib/orderAccess'
 import { orderWhatsappUrl } from '@/lib/whatsapp'
 import { useAuthStore } from '@/stores/auth'
 import { useCatalogStore } from '@/stores/catalog'
+import { useThemeStore } from '@/stores/theme'
 
 // The order's page: /pedido/:number. Opened from the emailed link (?token=…), after checkout, and
 // on the way back from Mercado Pago, which appends its own query (payment_id, status, …). Those
@@ -25,6 +26,7 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const catalog = useCatalogStore()
+const theme = useThemeStore()
 
 const order = ref<Order | null>(null)
 // The store's WhatsApp number from its checkout options; null when it has none (or they could not be read).
@@ -346,7 +348,11 @@ onBeforeUnmount(() => {
           </div>
           <div class="line-info">
             <span class="line-name">{{ l.name }}</span>
-            <span class="line-meta">Talle {{ l.size }} · x{{ l.quantity }}</span>
+            <span class="line-meta"
+              ><template v-if="!theme.isGrocery">Talle {{ l.size }} · </template>x{{
+                l.quantity
+              }}</span
+            >
           </div>
           <span class="line-total">{{ formatPrice(l.lineTotal) }}</span>
         </div>

@@ -36,7 +36,7 @@ const router = useRouter()
 const cart = useCartStore()
 // A grocery asks for a phone and takes no email: its shoppers are neighbors the owner reaches by phone or WhatsApp.
 const theme = useThemeStore()
-const grocery = computed(() => theme.theme?.storeKind === 'Grocery')
+const grocery = computed(() => theme.isGrocery)
 
 const delivery = ref<Delivery>('home')
 const payment = ref<PaymentMethod>('mercadopago')
@@ -113,7 +113,9 @@ function refusal(error: unknown): string {
     const items = error.problem.items as { productSlug: string; size: string; stock: number }[]
     const names = items.map((i) => {
       const line = cart.lines.find((l) => l.slug === i.productSlug && l.size === i.size)
-      return `${line?.name ?? i.productSlug} (talle ${i.size})`
+      return grocery.value
+        ? (line?.name ?? i.productSlug)
+        : `${line?.name ?? i.productSlug} (talle ${i.size})`
     })
     return `No hay stock suficiente de ${names.join(', ')}. Revisá tu carrito.`
   }
@@ -302,7 +304,9 @@ async function placeOrder() {
           </div>
           <div class="line-info">
             <span class="line-name">{{ l.name }}</span>
-            <span class="line-meta">Talle {{ l.size }} · x{{ l.qty }}</span>
+            <span class="line-meta"
+              ><template v-if="!grocery">Talle {{ l.size }} · </template>x{{ l.qty }}</span
+            >
           </div>
           <span class="line-total">{{ formatPrice(l.total) }}</span>
         </div>
