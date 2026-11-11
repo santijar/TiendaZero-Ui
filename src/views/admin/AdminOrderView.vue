@@ -273,7 +273,7 @@ onMounted(load)
             <thead>
               <tr>
                 <th>Producto</th>
-                <th>Talle</th>
+                <th>{{ theme.isGrocery ? 'Presentación' : 'Talle' }}</th>
                 <th class="admin-num">Cantidad</th>
                 <th class="admin-num">Precio</th>
                 <th class="admin-num">Subtotal</th>

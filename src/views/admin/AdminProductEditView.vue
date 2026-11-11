@@ -19,9 +19,16 @@ import {
   type SaveProduct,
 } from '@/api/admin'
 import { ApiError } from '@/api/http'
+import { useThemeStore } from '@/stores/theme'
 
 // /admin/productos/nuevo (no id) or /admin/productos/:id.
 const props = defineProps<{ id?: number }>()
+
+// A grocery sells by the pack, not by clothing size: its "sizes" are presentations (500 g, 1 kg), a new product starts
+// with one "Unidad", and it has no color to give (the catalog still needs one, so "Único" is sent).
+const theme = useThemeStore()
+const grocery = computed(() => theme.isGrocery)
+const sizeWord = computed(() => (grocery.value ? 'presentación' : 'talle'))
 
 interface SizeRow {
   key: number
@@ -96,11 +103,16 @@ function fill(p: AdminProduct) {
 async function load() {
   try {
     const [cats, cols] = await Promise.all([getCategories(), getCollections()])
+    // The kind of store decides what a new product starts with, so wait for the theme that says it.
+    await theme.ensureLoaded().catch(() => {})
     categories.value = cats
     collections.value = cols
     if (props.id === undefined) {
       form.categoryId = cats[0]?.id ?? 0
-      sizes.value = ['S', 'M', 'L', 'XL'].map((size) => newSize(size))
+      if (grocery.value) form.color = 'Único'
+      sizes.value = (grocery.value ? ['Unidad'] : ['S', 'M', 'L', 'XL']).map((size) =>
+        newSize(size),
+      )
     } else {
       fill(await getProduct(props.id))
     }
@@ -180,7 +192,8 @@ function checkSizes(): boolean {
   for (const row of sizes.value) {
     fillSku(row)
     const problem: { size?: string; sku?: string } = {}
-    if (!row.size.trim()) problem.size = 'Falta el talle.'
+    if (!row.size.trim())
+      problem.size = grocery.value ? 'Falta la presentación.' : 'Falta el talle.'
     if (!row.sku.trim()) problem.sku = 'Falta el SKU.'
     if (problem.size || problem.sku) found[row.key] = problem
   }
@@ -361,7 +374,7 @@ onMounted(load)
             </select>
             <span v-if="errors.categoryId" class="form-error">{{ errors.categoryId }}</span>
           </div>
-          <div class="field">
+          <div v-if="!grocery" class="field">
             <label for="p-color">Color</label>
             <input id="p-color" v-model="form.color" class="input" />
             <span v-if="errors.color" class="form-error">{{ errors.color }}</span>
@@ -399,13 +412,17 @@ onMounted(load)
       </section>
 
       <section class="card admin-section">
-        <h2>Talles y stock</h2>
+        <h2>{{ grocery ? 'Presentaciones y stock' : 'Talles y stock' }}</h2>
+        <p v-if="grocery" class="admin-muted">
+          Cada presentación es una forma de vender el producto, por ejemplo 500 g o 1 kg. Si lo
+          vendés de una sola forma, dejá «Unidad».
+        </p>
         <span v-if="errors.variants" class="form-error">{{ errors.variants }}</span>
         <div class="admin-table-wrap">
           <table class="table sizes">
             <thead>
               <tr>
-                <th>Talle</th>
+                <th>{{ grocery ? 'Presentación' : 'Talle' }}</th>
                 <th>SKU</th>
                 <th class="admin-num">Stock</th>
                 <th />
@@ -417,7 +434,7 @@ onMounted(load)
                   <input
                     v-model="s.size"
                     class="input"
-                    :aria-label="`Talle ${i + 1}`"
+                    :aria-label="`${grocery ? 'Presentación' : 'Talle'} ${i + 1}`"
                     :aria-invalid="!!rowErrors[s.key]?.size"
                     @input="clearRowError(s, 'size')"
                     @blur="fillSku(s)"
@@ -480,7 +497,9 @@ onMounted(load)
           </table>
         </div>
         <div class="admin-actions">
-          <button type="button" class="btn btn-secondary" @click="addSize">Agregar talle</button>
+          <button type="button" class="btn btn-secondary" @click="addSize">
+            Agregar {{ sizeWord }}
+          </button>
         </div>
         <p class="admin-muted">
           Las ventas descuentan stock solas. Si cambia mientras editás, te avisamos antes de
